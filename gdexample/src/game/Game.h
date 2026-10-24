@@ -21,6 +21,8 @@ public:
     void OnSpriteScreenEntered(Object_t sprite_id) override;
     void OnSpriteScreenExited(Object_t sprite_id) override;
 
+    void OnUiNodeDestoryed(Object_t sprite_id) override;
+
     sptr<ISprite> GetSprite(const std::string& name) override;
     sptr<ISprite> GetSprite(Object_t id) override;
     sptr<ICamera> GetCamera() const override;

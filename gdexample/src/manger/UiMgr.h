@@ -16,4 +16,6 @@ class UiMgr : public BaseManger {
     XVec2 GetCanvasScale(Object_t);
     void SetPosition(Object_t object_id,const XVec2& scale);
     XVec2 GetPosition(Object_t object_id) const ;
+
+    bool DeleteUiNode(Object_t object_id) const;
 };

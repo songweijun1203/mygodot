@@ -103,3 +103,11 @@ XVec2 UiMgr::GetPosition(Object_t object_id) const
     api.ui_get_position(object_id, &ret_value);
     return XVec2{ret_value.x, ret_value.y};
 }
+
+bool UiMgr::DeleteUiNode(Object_t object_id) const
+{
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    spx_api::GdBool ret;
+    api.ui_destroy_node(object_id,&ret);
+    return ret;
+}

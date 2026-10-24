@@ -16,4 +16,6 @@ public:
 
     void OnSpriteScreenEntered(Object_t sprite_id) override;
     void OnSpriteScreenExited(Object_t sprite_id) override;
+
+    void OnUiNodeDestoryed(Object_t sprite_id) override;
 };

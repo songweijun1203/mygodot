@@ -26,6 +26,8 @@ public:
     virtual void OnSpriteScreenEntered(Object_t sprite_id) = 0;
     virtual void OnSpriteScreenExited(Object_t sprite_id) = 0;
 
+    virtual void OnUiNodeDestoryed(Object_t sprite_id) =0;
+
     virtual sptr<ISprite> GetSprite(const std::string& name) =0;
     virtual sptr<ISprite> GetSprite(Object_t id) =0;
     virtual sptr<ICamera> GetCamera() const=0;

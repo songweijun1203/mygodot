@@ -21,6 +21,8 @@ public:
     virtual void OnSpriteTriggerExited(Object_t src,Object_t dest) =0;
     virtual void OnSpriteScreenEntered(Object_t sprite_id) = 0;
     virtual void OnSpriteScreenExited(Object_t sprite_id) = 0;
+
+    virtual void OnUiNodeDestoryed(Object_t sprite_id) = 0;
 public:
     void SetGame(sptr<IGame> g);
     sptr<IGame> GetGame();

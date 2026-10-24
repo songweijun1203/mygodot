@@ -93,3 +93,10 @@ void Engine::OnSpriteScreenExited(Object_t sprite_id)
         game->OnSpriteScreenExited(sprite_id);
     }
 }
+
+void Engine::OnUiNodeDestoryed(Object_t sprite_id)
+{
+    if(auto game = GetGame()){
+        game->OnUiNodeDestoryed(sprite_id);
+    }
+}

@@ -137,31 +137,31 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         mData->uiSay = makeShareObject<UiSay>();
         if (mData->uiSay->CreateGdNode("res://engine/ui/UiSay.tscn"))
         {
-            auto ui_say =mData->uiSay->asDerived<UiSay>();
+            auto ui_say = mData->uiSay->asDerived<UiSay>();
 
             ui_say->BindVariantNodes();
             auto leftSay = ui_say->GetChildUiNode(UiSayLeftOrRight::left, UiSayOrThink::say);
             auto leftThink = ui_say->GetChildUiNode(UiSayLeftOrRight::left, UiSayOrThink::think);
-            auto left_bubble = ui_say->GetVariantRoot(UiSayLeftOrRight::left,UiSayOrThink::say);
+            auto left_bubble = ui_say->GetVariantRoot(UiSayLeftOrRight::left, UiSayOrThink::say);
             auto rightSay = ui_say->GetChildUiNode(UiSayLeftOrRight::right, UiSayOrThink::say);
             auto rightThink = ui_say->GetChildUiNode(UiSayLeftOrRight::right, UiSayOrThink::think);
-            auto right_bubble = ui_say->GetVariantRoot(UiSayLeftOrRight::right,UiSayOrThink::say);
-           
+            auto right_bubble = ui_say->GetVariantRoot(UiSayLeftOrRight::right, UiSayOrThink::say);
+
             left_bubble->SetVisible(true);
             right_bubble->SetVisible(true);
-           
+
             leftSay->SetText("left say");
             rightSay->SetText("right say");
             leftThink->SetText("left think");
             rightThink->SetText("right think");
 
-             mData->uiSay->GetUiNode()->SetPosition(XVec2{300, 300});
+            mData->uiSay->GetUiNode()->SetPosition(XVec2{300, 300});
         }
     }
 
-    //uiquote节点
-    {   
+    // uiquote节点
 
+#if 0
         mData->uiQuote = makeShareObject<UiQuote>();
         if (mData->uiQuote->CreateGdNode("res://engine/ui/UiQuote.tscn")){
             auto ui_quote =mData->uiQuote->asDerived<UiQuote>();
@@ -173,7 +173,7 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
             des->SetText("quto des");
             ui_quote->GetUiNode()->SetPosition(XVec2{100,100});
         }
-    }
+#endif
     // 使用碰撞形状判断触发器，不根据纹理透明像素判断重叠。
     auto &spx = spx_api::GDExtensionInterface::get_instance();
     if (spx.physics_set_collision_system_type != nullptr)
@@ -210,6 +210,8 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         player->GetGdSprite()->SetTriggerMask(2);
 
         mData->sprites.push_back(player);
+
+        auto bubble = player->GetQuoteBubble();
 
         // 相机改为死区跟随，人物不再被钉在屏幕正中。
         mData->camera->SetFollowSprite(player);
@@ -272,39 +274,6 @@ void Game::OnEngineUpdate(float ddelta)
     {
         return;
     }
-#if 0
-    XVec2 direction{};
-    if (mData->move_left)
-    {
-        direction.x -= 1.0f;
-    }
-    if (mData->move_right)
-    {
-        direction.x += 1.0f;
-    }
-    if (mData->move_up)
-    {
-        direction.y += 1.0f;
-    }
-    if (mData->move_down)
-    {
-        direction.y -= 1.0f;
-    }
-
-    // 对角线移动时归一化方向，避免速度变成约 1.414 倍。
-    const float length = std::sqrt(
-        direction.x * direction.x + direction.y * direction.y);
-    constexpr float player_speed = 200.0f;
-    XVec2 velocity{};
-    if (length > 0.0f)
-    {
-        velocity.x = direction.x / length * player_speed;
-        velocity.y = direction.y / length * player_speed;
-    }
-
-    auto gd_sprite = player->GetGdSprite();
-    gd_sprite->SetVelocity(velocity);
-#endif
     // 相机跟随物理结算后的实际位置，碰撞时不会继续穿过障碍物。
     // 死区规则在 ICamera::Follow 里，人物只在死区外才拖着相机走。
     GetCamera()->Follow(ddelta);
@@ -480,6 +449,10 @@ void Game::OnSpriteScreenExited(Object_t sprite_id)
     {
         std::cout << "sprite name:" << s->GetName() << std::endl;
     }
+}
+
+void Game::OnUiNodeDestoryed(Object_t sprite_id)
+{
 }
 
 sptr<ISprite> Game::GetSprite(const std::string &name)

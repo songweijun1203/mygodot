@@ -24,6 +24,8 @@ class GdUiNode:public IGdUiNode{
 
     void SetPosition(const XVec2& scale) override;
     XVec2 GetPosition() const override;
+
+    virtual bool DeleteLater() override;
 public:
     Object_t id;
 };

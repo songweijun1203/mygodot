@@ -16,6 +16,5 @@ public:
     virtual void SetPosition(const XVec2& scale) =0;
     virtual XVec2 GetPosition() const =0;
 
-    //获取子节点的位姿矩阵(子节点在父节点下的位姿)
-    //virtual Matrix3f GetChildNodePosture(sptr<IGdUiNode> child) const=0;
+    virtual bool DeleteLater() =0;
 };

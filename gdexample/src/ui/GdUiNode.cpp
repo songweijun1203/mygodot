@@ -50,3 +50,9 @@ XVec2 GdUiNode::GetPosition() const
     auto uiMgr = DataManger::getInstance().getUiMgr()->asDerived<UiMgr>();
     return uiMgr->GetPosition(GetId());
 }
+
+bool GdUiNode::DeleteLater()
+{
+    auto uiMgr = DataManger::getInstance().getUiMgr()->asDerived<UiMgr>();
+    return uiMgr->DeleteUiNode(GetId());
+}
