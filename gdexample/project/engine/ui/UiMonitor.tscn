@@ -1,0 +1,324 @@
+[gd_scene load_steps=13 format=3 uid="uid://bsaqlmdsvus4d"]
+
+[ext_resource type="Texture2D" uid="uid://dtaph1d474hyg" path="res://engine/textures/monitor/frame_name.png" id="1_y7j7f"]
+[ext_resource type="Texture2D" uid="uid://d1544egog82vl" path="res://engine/textures/monitor/frame_value.png" id="2_rbnwe"]
+
+[ext_resource type="Texture2D" path="res://engine/textures/monitor/slider_thumb.svg" id="3_slider_thumb"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_track"]
+bg_color = Color(0.8, 0.8, 0.8, 1)
+content_margin_top = 3.0
+content_margin_bottom = 3.0
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_5mp4r"]
+texture = ExtResource("1_y7j7f")
+texture_margin_left = 26.0
+texture_margin_top = 2.0
+texture_margin_right = 26.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_c560o"]
+texture = ExtResource("2_rbnwe")
+texture_margin_left = 16.0
+texture_margin_top = 3.0
+texture_margin_right = 16.0
+texture_margin_bottom = 3.0
+expand_margin_top = 2.0
+expand_margin_right = 26.0
+modulate_color = Color(0.996078, 1, 1, 1)
+
+[sub_resource type="Theme" id="Theme_gvmbf"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_sbh8w"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scratch_default"]
+content_margin_left = 9.0
+content_margin_top = 9.0
+content_margin_right = 9.0
+content_margin_bottom = 9.0
+bg_color = Color(0.898039, 0.941176, 1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.764706, 0.8, 0.85098, 1)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scratch_value"]
+content_margin_left = 4.0
+content_margin_right = 4.0
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scratch_large_outer"]
+content_margin_left = 2.0
+content_margin_top = 2.0
+content_margin_right = 2.0
+content_margin_bottom = 2.0
+bg_color = Color(0.898039, 0.941176, 1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.764706, 0.8, 0.85098, 1)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scratch_large_value"]
+content_margin_left = 9.0
+content_margin_top = 0.0
+content_margin_right = 9.0
+content_margin_bottom = 0.0
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+
+[node name="Monitor" type="Control"]
+visible = false
+layout_mode = 3
+mouse_filter = 2
+anchors_preset = 0
+
+[node name="ScratchList" type="SpxListMonitor" parent="."]
+visible = false
+layout_mode = 0
+offset_right = 100.0
+offset_bottom = 200.0
+
+[node name="BG" type="PanelContainer" parent="."]
+layout_mode = 1
+mouse_filter = 0
+offset_right = 100.0
+offset_bottom = 44.0
+scale = Vector2(0.45, 0.45)
+theme_override_styles/panel = SubResource("StyleBoxTexture_5mp4r")
+
+[node name="H" type="HBoxContainer" parent="BG"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LabelName" type="Label" parent="BG/H"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 26
+text = "a"
+vertical_alignment = 1
+text_direction = 1
+
+[node name="Space" type="Label" parent="BG/H"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 26
+text = "  "
+vertical_alignment = 1
+text_direction = 1
+
+[node name="C" type="PanelContainer" parent="BG/H"]
+layout_direction = 3
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_c560o")
+
+[node name="H" type="HBoxContainer" parent="BG/H/C"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LabelValue" type="Label" parent="BG/H/C/H"]
+custom_minimum_size = Vector2(1, 0)
+layout_direction = 2
+layout_mode = 2
+mouse_filter = 2
+theme = SubResource("Theme_gvmbf")
+theme_override_colors/font_color = Color(0.129412, 0.623529, 0.988235, 1)
+theme_override_font_sizes/font_size = 26
+theme_override_styles/normal = SubResource("StyleBoxEmpty_sbh8w")
+text = "a"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Space" type="Label" parent="BG/H/C/H"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 26
+text = "  "
+horizontal_alignment = 1
+vertical_alignment = 1
+text_direction = 1
+
+[node name="ValueOnly" type="PanelContainer" parent="."]
+visible = false
+custom_minimum_size = Vector2(111, 54)
+layout_mode = 1
+mouse_filter = 0
+offset_right = 100.0
+offset_bottom = 42.0
+scale = Vector2(0.45, 0.45)
+size_flags_stretch_ratio = 0.0
+theme_override_styles/panel = SubResource("StyleBoxTexture_5mp4r")
+
+[node name="LabelValue" type="Label" parent="ValueOnly"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 36
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ScratchBG" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+mouse_filter = 0
+offset_right = 100.0
+offset_bottom = 44.0
+scale = Vector2(0.45, 0.45)
+theme_override_styles/panel = SubResource("StyleBoxFlat_scratch_default")
+
+[node name="H" type="HBoxContainer" parent="ScratchBG"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="LabelMargin" type="MarginContainer" parent="ScratchBG/H"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 11
+theme_override_constants/margin_right = 11
+
+[node name="LabelName" type="Label" parent="ScratchBG/H/LabelMargin"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.341176, 0.368627, 0.458824, 1)
+theme_override_colors/font_outline_color = Color(0.341176, 0.368627, 0.458824, 1)
+theme_override_constants/outline_size = 1
+theme_override_font_sizes/font_size = 26
+text = "score"
+vertical_alignment = 1
+
+[node name="ValueMargin" type="MarginContainer" parent="ScratchBG/H"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 11
+theme_override_constants/margin_right = 11
+
+[node name="C" type="PanelContainer" parent="ScratchBG/H/ValueMargin"]
+custom_minimum_size = Vector2(89, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_scratch_value")
+
+[node name="LabelValue" type="Label" parent="ScratchBG/H/ValueMargin/C"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ScratchValueOnly" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+mouse_filter = 0
+offset_right = 100.0
+offset_bottom = 42.0
+scale = Vector2(0.45, 0.45)
+theme_override_styles/panel = SubResource("StyleBoxFlat_scratch_large_outer")
+
+[node name="C" type="PanelContainer" parent="ScratchValueOnly"]
+custom_minimum_size = Vector2(107, 50)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_scratch_large_value")
+
+[node name="LabelValue" type="Label" parent="ScratchValueOnly/C"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.15, 0.18, 0.24, 1)
+theme_override_font_sizes/font_size = 36
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ScratchSlider" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+offset_right = 100.0
+offset_bottom = 44.0
+scale = Vector2(0.45, 0.45)
+theme_override_styles/panel = SubResource("StyleBoxFlat_scratch_default")
+
+[node name="V" type="VBoxContainer" parent="ScratchSlider"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="H" type="HBoxContainer" parent="ScratchSlider/V"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="LabelMargin" type="MarginContainer" parent="ScratchSlider/V/H"]
+layout_mode = 2
+theme_override_constants/margin_left = 11
+theme_override_constants/margin_right = 11
+
+[node name="LabelName" type="Label" parent="ScratchSlider/V/H/LabelMargin"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.341176, 0.368627, 0.458824, 1)
+theme_override_colors/font_outline_color = Color(0.341176, 0.368627, 0.458824, 1)
+theme_override_constants/outline_size = 1
+theme_override_font_sizes/font_size = 26
+text = "score"
+vertical_alignment = 1
+
+[node name="ValueMargin" type="MarginContainer" parent="ScratchSlider/V/H"]
+layout_mode = 2
+theme_override_constants/margin_left = 11
+theme_override_constants/margin_right = 11
+
+[node name="C" type="PanelContainer" parent="ScratchSlider/V/H/ValueMargin"]
+custom_minimum_size = Vector2(89, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_scratch_value")
+
+[node name="LabelValue" type="Label" parent="ScratchSlider/V/H/ValueMargin/C"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slider" type="HSlider" parent="ScratchSlider/V"]
+custom_minimum_size = Vector2(200, 30)
+layout_mode = 2
+mouse_filter = 0
+focus_mode = 2
+scrollable = false
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_track")
+theme_override_icons/grabber = ExtResource("3_slider_thumb")
+theme_override_icons/grabber_highlight = ExtResource("3_slider_thumb")
+theme_override_icons/grabber_disabled = ExtResource("3_slider_thumb")

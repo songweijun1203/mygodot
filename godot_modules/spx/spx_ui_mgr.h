@@ -74,6 +74,7 @@ public:
 
 	SPX_BIND GdInt get_type(GdObj obj);
 	SPX_BIND void set_text(GdObj obj, GdString text);
+	SPX_BIND GdFloat set_text_max_width(GdObj obj, GdString text, GdFloat max_width);
 	SPX_BIND void set_list_items(GdObj obj, GdString label, GdArray items, GdColor color);
 	SPX_BIND void set_range(GdObj obj, GdFloat minimum, GdFloat maximum, GdFloat step, GdFloat value);
 	SPX_BIND GdFloat get_range_value(GdObj obj);
@@ -107,6 +108,7 @@ public:
 	SPX_BIND void set_global_position(GdObj obj, GdVec2 value);
 	SPX_BIND GdFloat get_rotation(GdObj obj);
 	SPX_BIND void set_rotation(GdObj obj, GdFloat value);
+	SPX_BIND GdVec2 get_canvas_scale(GdObj obj);
 
 	SPX_BIND GdBool get_flip(GdObj obj, GdBool horizontal);
 	SPX_BIND void set_flip(GdObj obj, GdBool horizontal, GdBool is_flip);

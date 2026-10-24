@@ -341,6 +341,7 @@ void GDExtensionInterface::initialize(
 	ui_destroy_node = resolve<GDExtensionSpxUiDestroyNode>("spx_ui_destroy_node");
 	ui_get_type = resolve<GDExtensionSpxUiGetType>("spx_ui_get_type");
 	ui_set_text = resolve<GDExtensionSpxUiSetText>("spx_ui_set_text");
+	ui_set_text_max_width = resolve<GDExtensionSpxUiSetTextMaxWidth>("spx_ui_set_text_max_width");
 	ui_set_list_items = resolve<GDExtensionSpxUiSetListItems>("spx_ui_set_list_items");
 	ui_set_range = resolve<GDExtensionSpxUiSetRange>("spx_ui_set_range");
 	ui_get_range_value = resolve<GDExtensionSpxUiGetRangeValue>("spx_ui_get_range_value");
@@ -365,6 +366,7 @@ void GDExtensionInterface::initialize(
 	ui_set_anchors_preset = resolve<GDExtensionSpxUiSetAnchorsPreset>("spx_ui_set_anchors_preset");
 	ui_get_scale = resolve<GDExtensionSpxUiGetScale>("spx_ui_get_scale");
 	ui_set_scale = resolve<GDExtensionSpxUiSetScale>("spx_ui_set_scale");
+	ui_get_canvas_scale = resolve<GDExtensionSpxUiGetCanvasScale>("spx_ui_get_canvas_scale");
 	ui_get_position = resolve<GDExtensionSpxUiGetPosition>("spx_ui_get_position");
 	ui_set_position = resolve<GDExtensionSpxUiSetPosition>("spx_ui_set_position");
 	ui_get_size = resolve<GDExtensionSpxUiGetSize>("spx_ui_get_size");
@@ -680,6 +682,7 @@ void GDExtensionInterface::initialize(
 			ui_destroy_node != nullptr &&
 			ui_get_type != nullptr &&
 			ui_set_text != nullptr &&
+			ui_set_text_max_width != nullptr &&
 			ui_set_list_items != nullptr &&
 			ui_set_range != nullptr &&
 			ui_get_range_value != nullptr &&
@@ -704,6 +707,7 @@ void GDExtensionInterface::initialize(
 			ui_set_anchors_preset != nullptr &&
 			ui_get_scale != nullptr &&
 			ui_set_scale != nullptr &&
+			ui_get_canvas_scale != nullptr &&
 			ui_get_position != nullptr &&
 			ui_set_position != nullptr &&
 			ui_get_size != nullptr &&

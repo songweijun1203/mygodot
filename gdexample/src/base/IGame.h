@@ -8,6 +8,7 @@ namespace godot{
 
 class ISprite;
 class ICamera;
+class IGdMonitor;
 class IGame:public XBaseObject{
 public:
     virtual ~IGame() = default;
@@ -27,4 +28,5 @@ public:
     virtual sptr<ISprite> GetSprite(const std::string& name) =0;
     virtual sptr<ISprite> GetSprite(Object_t id) =0;
     virtual sptr<ICamera> GetCamera() const=0;
+    virtual sptr<IGdMonitor> GetMonitor() const =0;
 };

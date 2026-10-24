@@ -1268,6 +1268,15 @@ static void gdextension_spx_ui_set_text(GdObj obj, GdString text) {
 	uiMgr->set_text(obj, text);
 }
 
+static void gdextension_spx_ui_set_text_max_width(
+        GdObj obj,
+        GdString text,
+        GdFloat max_width,
+        GdFloat *ret_value) {
+    *ret_value =
+        uiMgr->set_text_max_width(obj, text, max_width);
+}
+
 static void gdextension_spx_ui_set_list_items(GdObj obj, GdString label, GdArray items, GdColor color) {
 	uiMgr->set_list_items(obj, label, items, color);
 }
@@ -1362,6 +1371,10 @@ static void gdextension_spx_ui_get_scale(GdObj obj, GdVec2 *ret_val) {
 
 static void gdextension_spx_ui_set_scale(GdObj obj, GdVec2 value) {
 	uiMgr->set_scale(obj, value);
+}
+
+static void gdextension_spx_ui_get_canvas_scale(GdObj obj, GdVec2 *ret_val) {
+	*ret_val = uiMgr->get_canvas_scale(obj);
 }
 
 static void gdextension_spx_ui_get_position(GdObj obj, GdVec2 *ret_val) {
@@ -1709,6 +1722,7 @@ void gdextension_spx_setup_interface() {
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_destroy_node);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_get_type);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_set_text);
+	REGISTER_SPX_INTERFACE_FUNC(spx_ui_set_text_max_width);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_set_list_items);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_set_range);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_get_range_value);
@@ -1733,6 +1747,7 @@ void gdextension_spx_setup_interface() {
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_set_anchors_preset);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_get_scale);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_set_scale);
+	REGISTER_SPX_INTERFACE_FUNC(spx_ui_get_canvas_scale);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_get_position);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_set_position);
 	REGISTER_SPX_INTERFACE_FUNC(spx_ui_get_size);

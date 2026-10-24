@@ -223,6 +223,46 @@ void SpxUi::set_text(GdString text) {
 	}
 }
 
+//TODO
+GdFloat SpxUi::set_text_max_width(GdString text, GdFloat max_width)
+{
+	if (type != (int)ESpxUiType::Label) {
+		print_error(String("SpxUi type mismatch in ") + String(__func__) +
+				": expected Label, got " + itos(type));
+		return 0;
+	}
+
+	SpxLabel *label = get_label();
+	ERR_FAIL_NULL_V(label, 0);
+	GdVec2 text_custom_minimum_size{1,1};
+/*
+	if (!text_custom_minimum_size_initialized) {
+		text_custom_minimum_size = label->get_custom_minimum_size();
+		text_custom_minimum_size_initialized = true;
+	}
+		*/
+
+	//先关闭自动换行
+	label->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
+	label->set_custom_minimum_size(text_custom_minimum_size);
+	label->set_text(SpxStr(text));
+	auto font_size = label->get_theme_font_size("font_size");
+	const GdFloat natural_width = label->get_minimum_size().x;
+
+	if (!Math::is_finite(max_width) || max_width <= 0 || natural_width <= max_width) {
+		return natural_width;
+	}
+
+	//说明文件当前文本内容宽度超过了max_width
+	const GdFloat wrapped_width =
+		MAX((GdFloat)text_custom_minimum_size.x, MAX((GdFloat)1, max_width));
+	label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	label->set_custom_minimum_size(Size2(wrapped_width, text_custom_minimum_size.y));
+	label->set_size(Size2(wrapped_width, label->get_size().y));
+	label->update_minimum_size();
+	return wrapped_width;
+}
+
 GdString SpxUi::get_text() {
 	String value = "";
 	auto etype = (ESpxUiType)type;
@@ -359,6 +399,11 @@ GdFloat SpxUi::get_rotation() {
 
 void SpxUi::set_rotation(GdFloat value) {
 	get_control()->set_rotation(value);
+}
+
+GdVec2 SpxUi::get_canvas_scale() {
+	auto scale = get_control()->get_global_transform_with_canvas().get_scale();
+	return GdVec2{scale.x, scale.y};
 }
 
 GdBool SpxUi::get_flip(GdBool horizontal) {

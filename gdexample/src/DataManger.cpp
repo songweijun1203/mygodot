@@ -1,5 +1,6 @@
 #include "DataManger.h"
 #include "manger/SpriteMgr.h"
+#include "manger/UiMgr.h"
 
 #include "engine/Engine.h"
 
@@ -11,6 +12,7 @@ void DataManger::init()
     {
         g_isInited = true;
         m_spriteMgr = makeShareObject<SpriteMgr>();
+        m_uiMgr = makeShareObject<UiMgr>();
         m_engine = makeShareObject<Engine>();
     }
 }
@@ -27,6 +29,11 @@ void DataManger::release()
 sptr<IManger> DataManger::getSpriteMgr()
 {
     return m_spriteMgr;
+}
+
+sptr<IManger> DataManger::getUiMgr()
+{
+    return m_uiMgr;
 }
 
 sptr<IEngine> DataManger::getEngine()

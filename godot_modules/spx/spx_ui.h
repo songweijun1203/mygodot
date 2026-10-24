@@ -98,6 +98,7 @@ public:
 	void set_interactable(GdBool interactable);
 	GdBool is_interactable();
 	void set_text(GdString text);
+	GdFloat set_text_max_width(GdString text, GdFloat max_width);
 	GdString get_text();
 	void set_rect(GdRect2 rect);
 	GdRect2 get_rect();
@@ -130,6 +131,7 @@ public:
 	void set_global_position(GdVec2 value);
 	GdFloat get_rotation();
 	void set_rotation(GdFloat value);
+	GdVec2 get_canvas_scale();
 
 	GdBool get_flip(GdBool horizontal);
 	void set_flip(GdBool horizontal, GdBool is_flip);

@@ -24,6 +24,7 @@ public:
     sptr<ISprite> GetSprite(const std::string& name) override;
     sptr<ISprite> GetSprite(Object_t id) override;
     sptr<ICamera> GetCamera() const override;
+    sptr<IGdMonitor> GetMonitor() const override;
 protected:
     class Internal;
     std::unique_ptr<Internal> mData;

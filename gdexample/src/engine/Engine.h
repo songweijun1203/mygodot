@@ -7,6 +7,8 @@ public:
     void OnEngineUpdate(float delta) override;
     void OnKeyPressed(int64_t key) override;
     void OnKeyReleased(int64_t key) override;
+    void OnMousePressed(int64_t key) override;
+    void OnMouseReleased(int64_t key) override;
     void OnEngineFixedUpdate(float delta) override;
     void OnSpriteCollisionEnter(Object_t src,Object_t dest) override;
     void OnSpriteTriggerEnter(Object_t src,Object_t dest) override;

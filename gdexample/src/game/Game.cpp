@@ -5,18 +5,29 @@
 #include "DataManger.h"
 #include "manger/SpriteMgr.h"
 #include "sprite/Sprite.h"
+#include "ui/GdMonitor.h"
 #include "camera/Camera.h"
 #include "spx_api.h"
 
 #include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/viewport.hpp>
+#include <godot_cpp/classes/window.hpp>
 
 #include <cmath>
 #include <vector>
 
 #include <iostream>
+
+//临时测试
+std::vector<std::string> monitor_test_labels{
+    {"SetScratchValueOnlyLabelValueText SetScratchValueOnlyLabelValueText"},
+    {"test!"},
+    {"helloworld"}
+};
 
 class Game::Internal
 {
@@ -24,17 +35,24 @@ public:
     Internal()
     {
         camera = makeShareObject<Camera>();
+        viewport_width = 0;
+        viewport_height = 0;
     }
 
 public:
     godot::Node *root;
     std::vector<sptr<ISprite>> sprites;
     sptr<Camera> camera;
+    sptr<IGdMonitor> monitor;
+    int64_t viewport_width;
+    int64_t viewport_height;
 
     bool move_left = false;
     bool move_right = false;
     bool move_up = false;
     bool move_down = false;
+
+    bool isMonitorInit = false;
 };
 
 Game::Game() : mData(new Game::Internal())
@@ -48,22 +66,26 @@ Game::~Game()
 void Game::OnEngineStart(godot::Node *SpxEngineNode)
 {
     mData->root = SpxEngineNode;
-
-    // 使用碰撞形状判断触发器，不根据纹理透明像素判断重叠。
-    auto &spx = spx_api::GDExtensionInterface::get_instance();
-    if (spx.physics_set_collision_system_type != nullptr)
     {
-        spx.physics_set_collision_system_type(false);
+        godot::Viewport *viewport = nullptr;
+
+        // 启动回调可能早于 SpxEngineNode 完成入树，节点自身的
+        // get_viewport() 此时可能暂时返回空指针。
+        if (SpxEngineNode != nullptr)
+        {
+            viewport = SpxEngineNode->get_viewport();
+
+            if (viewport == nullptr)
+            {
+                if (auto *tree = SpxEngineNode->get_tree(); tree != nullptr)
+                {
+                    viewport = tree->get_root();
+                }
+            }
+        }
     }
 
     {
-        auto *viewport = SpxEngineNode->get_viewport();
-        if (viewport != nullptr)
-        {
-            const godot::Vector2 size =
-                viewport->get_visible_rect().get_size();
-        }
-
         auto *settings = godot::ProjectSettings::get_singleton();
 
         const int64_t design_width = static_cast<int64_t>(
@@ -75,7 +97,27 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
             settings->get_setting(
                 "display/window/size/viewport_height",
                 360));
+        mData->viewport_width = design_width;
+        mData->viewport_height = design_height;
     }
+    // 监视器节点
+    {
+        mData->monitor = makeShareObject<GdMonitor>();
+        mData->monitor->CreateGdNode("res://engine/ui/UiMonitor.tscn");
+        mData->monitor->BindViews();
+
+        mData->monitor->GetUiNode()->SetVisible(true);
+        mData->monitor->GetUiNode()->SetScale(XVec2{3, 3});
+
+        // 当前窗口的宽高已经获取到
+    }
+    // 使用碰撞形状判断触发器，不根据纹理透明像素判断重叠。
+    auto &spx = spx_api::GDExtensionInterface::get_instance();
+    if (spx.physics_set_collision_system_type != nullptr)
+    {
+        spx.physics_set_collision_system_type(false);
+    }
+
     // 设置游戏精灵
     {
         auto player = makeShareObject<Sprite>("player");
@@ -192,12 +234,32 @@ void Game::OnEngineUpdate(float ddelta)
     // 相机跟随物理结算后的实际位置，碰撞时不会继续穿过障碍物。
     auto gd_sprite = player->GetGdSprite();
     GetCamera()->SetPosition(gd_sprite->GetPosition());
+
+    if (mData->isMonitorInit == false)
+    {
+        auto root = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::root);
+        root->SetVisible(true);
+
+        auto label = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::value);
+        auto cavans_scale = label->GetCanvasScale();
+        {
+            auto ss = root->GetScale(); //(0.45,0.45)
+            auto s = label->GetScale();
+            auto total_scale_x = 3 * ss.x * s.x;
+            auto total_scale_y = 3 * ss.y * s.y;
+        }
+
+        auto w = (float)mData->viewport_width / cavans_scale.x;
+
+        auto r_w = label->SetTextMaxWidth("SetScratchValueOnlyLabelValueTextSetScratchValueOnlyLabelValueText", w - 4 - 18);
+        mData->isMonitorInit = true;
+    }
 }
 
 void Game::OnKeyPressed(int64_t key)
 {
     // 键盘摁下
-    //std::cout << "OnKeyPressed:" << key << std::endl;
+    // std::cout << "OnKeyPressed:" << key << std::endl;
     switch (static_cast<Keys>(key))
     {
     case Keys::left:
@@ -212,13 +274,27 @@ void Game::OnKeyPressed(int64_t key)
     case Keys::down:
         mData->move_down = true;
         break;
+    case Keys::space:
+    {
+        //临时测试
+        static int index = 1;
+        auto root = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::root);
+        auto label = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::value);
+        auto cavans_scale = label->GetCanvasScale();
+
+        auto w = (float)mData->viewport_width / cavans_scale.x;
+        index = (index+1)%3;
+        auto r_w = label->SetTextMaxWidth(monitor_test_labels[index], w - 4 - 18);
     }
+        break;
+    }
+    
 }
 
 void Game::OnKeyReleased(int64_t key)
 {
     // 键盘释放
-    //std::cout << "OnKeyReleased:" << key << std::endl;
+    // std::cout << "OnKeyReleased:" << key << std::endl;
     switch (static_cast<Keys>(key))
     {
     case Keys::left:
@@ -238,12 +314,12 @@ void Game::OnKeyReleased(int64_t key)
 
 void Game::OnMousePressed(int64_t key)
 {
-    std::cout<<"OnMousePressed"<<std::endl;
+    std::cout << "OnMousePressed" << std::endl;
 }
 
 void Game::OnMouseReleased(int64_t key)
 {
-    std::cout<<"OnMouseReleased"<<std::endl;
+    std::cout << "OnMouseReleased" << std::endl;
 }
 
 void Game::OnEngineFixedUpdate(float delta)
@@ -289,8 +365,9 @@ void Game::OnSpriteCollisionEnter(Object_t src, Object_t dest)
 {
     auto src_sprite = GetSprite(src);
     auto dest_sprite = GetSprite(dest);
-    if(src_sprite &&dest_sprite){
-        std::cout<<"collisionEnter:"<<src_sprite->GetName()<<" "<<dest_sprite->GetName()<<std::endl;
+    if (src_sprite && dest_sprite)
+    {
+        std::cout << "collisionEnter:" << src_sprite->GetName() << " " << dest_sprite->GetName() << std::endl;
     }
 }
 
@@ -298,8 +375,9 @@ void Game::OnSpriteTriggerEnter(Object_t src, Object_t dest)
 {
     auto src_sprite = GetSprite(src);
     auto dest_sprite = GetSprite(dest);
-    if(src_sprite &&dest_sprite){
-        std::cout<<"triggerEnter:"<<src_sprite->GetName()<<" "<<dest_sprite->GetName()<<std::endl;
+    if (src_sprite && dest_sprite)
+    {
+        std::cout << "triggerEnter:" << src_sprite->GetName() << " " << dest_sprite->GetName() << std::endl;
     }
 }
 
@@ -307,24 +385,27 @@ void Game::OnSpriteTriggerExited(Object_t src, Object_t dest)
 {
     auto src_sprite = GetSprite(src);
     auto dest_sprite = GetSprite(dest);
-    if(src_sprite &&dest_sprite){
-        std::cout<<"triggerExited:"<<src_sprite->GetName()<<" "<<dest_sprite->GetName()<<std::endl;
+    if (src_sprite && dest_sprite)
+    {
+        std::cout << "triggerExited:" << src_sprite->GetName() << " " << dest_sprite->GetName() << std::endl;
     }
 }
 
 void Game::OnSpriteScreenEntered(Object_t sprite_id)
 {
-    std::cout<<"OnSpriteScreenEntered:"<<sprite_id<<std::endl;
-    if(auto s = GetSprite(sprite_id)){
-        std::cout<<"sprite name:"<< s->GetName()<<std::endl;
+    std::cout << "OnSpriteScreenEntered:" << sprite_id << std::endl;
+    if (auto s = GetSprite(sprite_id))
+    {
+        std::cout << "sprite name:" << s->GetName() << std::endl;
     }
 }
 
 void Game::OnSpriteScreenExited(Object_t sprite_id)
 {
-    std::cout<<"OnSpriteScreenExited:"<<sprite_id<<std::endl;
-    if(auto s = GetSprite(sprite_id)){
-        std::cout<<"sprite name:"<< s->GetName()<<std::endl;
+    std::cout << "OnSpriteScreenExited:" << sprite_id << std::endl;
+    if (auto s = GetSprite(sprite_id))
+    {
+        std::cout << "sprite name:" << s->GetName() << std::endl;
     }
 }
 
@@ -355,4 +436,9 @@ sptr<ISprite> Game::GetSprite(Object_t id)
 sptr<ICamera> Game::GetCamera() const
 {
     return mData->camera;
+}
+
+sptr<IGdMonitor> Game::GetMonitor() const
+{
+    return mData->monitor;
 }

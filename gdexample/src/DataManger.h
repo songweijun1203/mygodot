@@ -17,6 +17,7 @@ public:
     void release();
     // 获取精灵管理器
     sptr<IManger> getSpriteMgr();
+    sptr<IManger> getUiMgr();
     sptr<IEngine> getEngine();
 
 private:
@@ -27,5 +28,6 @@ private:
 
 private:
     sptr<IManger> m_spriteMgr;
+    sptr<IManger> m_uiMgr;
     sptr<IEngine> m_engine;
 };

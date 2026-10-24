@@ -333,6 +333,12 @@ void SpxUiMgr::set_text(GdObj obj, GdString text) {
 	node->set_text(text);
 }
 
+SPX_BIND GdFloat SpxUiMgr::set_text_max_width(GdObj obj, GdString text, GdFloat max_width)
+{
+    SPX_REQUIRE_UI_RETURN(0)
+	return node->set_text_max_width(text, max_width);
+}
+
 void SpxUiMgr::set_list_items(GdObj obj, GdString label, GdArray items, GdColor color) {
 	SPX_REQUIRE_UI_VOID();
 	auto monitor = Object::cast_to<SpxListMonitor>(node->get_control());
@@ -482,6 +488,11 @@ GdFloat SpxUiMgr::get_rotation(GdObj obj) {
 void SpxUiMgr::set_rotation(GdObj obj, GdFloat value) {
 	SPX_REQUIRE_UI_VOID()
 	node->set_rotation(value);
+}
+
+GdVec2 SpxUiMgr::get_canvas_scale(GdObj obj) {
+	SPX_REQUIRE_UI_RETURN(GdVec2())
+	return node->get_canvas_scale();
 }
 
 GdBool SpxUiMgr::get_flip(GdObj obj, GdBool horizontal) {
