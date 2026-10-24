@@ -94,6 +94,14 @@ public:
     void SetColliderCapsule(Object_t id,const XVec2 &center, const XVec2 &size);
     void SetCollisionMask(Object_t id,uint32_t mask);
     void SetCollisionLayer(Object_t id,uint32_t layer);
+    void SetCollisionEnable(Object_t id,bool enable);
+
+    void SetTriggerEnable(Object_t id,bool enable);
+    void SetTriggerCircle(Object_t id,const XVec2 &center, float radius);
+    void SetTriggerRect(Object_t id,const XVec2 &center, const XVec2 &size);
+    void SetTriggerCapsule(Object_t id,const XVec2 &center, const XVec2 &size);
+    void SetTriggerMask(Object_t id,uint32_t mask);
+    void SetTriggerLayer(Object_t id,uint32_t layer);
 
     // 速度
     void SetVelocity(Object_t id,const XVec2 &velocity);

@@ -6,6 +6,7 @@
 #include "manger/SpriteMgr.h"
 #include "sprite/Sprite.h"
 #include "camera/Camera.h"
+#include "spx_api.h"
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/core/memory.hpp>
@@ -47,6 +48,14 @@ Game::~Game()
 void Game::OnEngineStart(godot::Node *SpxEngineNode)
 {
     mData->root = SpxEngineNode;
+
+    // 使用碰撞形状判断触发器，不根据纹理透明像素判断重叠。
+    auto &spx = spx_api::GDExtensionInterface::get_instance();
+    if (spx.physics_set_collision_system_type != nullptr)
+    {
+        spx.physics_set_collision_system_type(false);
+    }
+
     {
         auto *viewport = SpxEngineNode->get_viewport();
         if (viewport != nullptr)
@@ -80,17 +89,20 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         // 重力
         player->GetGdSprite()->SetUseGravity(true);
         player->GetGdSprite()->SetGravity(980.0f);
-        player->GetGdSprite()->SetGravityScale(1.0f);
+        player->GetGdSprite()->SetGravityScale(0.0f);
         // 物理参数
         player->GetGdSprite()->SetMass(1.0f);
         player->GetGdSprite()->SetDrag(2.0f);
 
-        // 玩家实体碰撞形状
+        // 玩家实体碰撞形状 碰撞过滤
+        player->GetGdSprite()->SetCollisionEnable(true);
         player->GetGdSprite()->SetColliderCircle(XVec2{0.0f, 0.0f}, 32.0f);
-
-        // 碰撞过滤
         player->GetGdSprite()->SetCollisionLayer(1);
         player->GetGdSprite()->SetCollisionMask(2);
+
+        player->GetGdSprite()->SetTriggerCircle(XVec2{0.0f, 0.0f}, 60.0f);
+        player->GetGdSprite()->SetTriggerLayer(1);
+        player->GetGdSprite()->SetTriggerMask(2);
 
         mData->sprites.push_back(player);
     }
@@ -107,10 +119,14 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         rock->GetGdSprite()->SetScale(XVec2{0.1f, 0.1f});
 
         rock->GetGdSprite()->SetPhysicsMode(PhysicsMode::Static);
-        // 根节点缩放为 0.1，因此 450 的局部半径最终显示为约 45 像素。
+        // 根节点缩放为 0.1，因此 450 的局部半径最终显示为约 45 像素。、
         rock->GetGdSprite()->SetColliderCircle(XVec2{0.0f, 0.0f}, 450.0f);
         rock->GetGdSprite()->SetCollisionLayer(2);
         rock->GetGdSprite()->SetCollisionMask(1);
+
+        rock->GetGdSprite()->SetTriggerCircle(XVec2{0.0f, 0.0f}, 450.0f);
+        rock->GetGdSprite()->SetTriggerLayer(2);
+        rock->GetGdSprite()->SetTriggerMask(1);
 
         mData->sprites.push_back(rock);
     }
@@ -181,7 +197,7 @@ void Game::OnEngineUpdate(float ddelta)
 void Game::OnKeyPressed(int64_t key)
 {
     // 键盘摁下
-    std::cout << "OnKeyPressed:" << key << std::endl;
+    //std::cout << "OnKeyPressed:" << key << std::endl;
     switch (static_cast<Keys>(key))
     {
     case Keys::left:
@@ -202,7 +218,7 @@ void Game::OnKeyPressed(int64_t key)
 void Game::OnKeyReleased(int64_t key)
 {
     // 键盘释放
-    std::cout << "OnKeyReleased:" << key << std::endl;
+    //std::cout << "OnKeyReleased:" << key << std::endl;
     switch (static_cast<Keys>(key))
     {
     case Keys::left:
@@ -234,6 +250,10 @@ void Game::OnEngineFixedUpdate(float delta)
     {
         force.y += 1500.0f;
     }
+    if (mData->move_down)
+    {
+        force.y -= 1500.0f;
+    }
 
     if (mData->move_left)
     {
@@ -245,7 +265,57 @@ void Game::OnEngineFixedUpdate(float delta)
         force.x += 800.0f;
     }
 
-    player->GetGdSprite()->AddForce(force);
+    // SPX 侧的 AddImpulse 会在当前动态物理帧消费并清零。
+    // 每个固定帧提交 force * delta，等价于持续施加 force，
+    // 同时避免使用当前不会自动清零的 external_forces。
+    if (force.x != 0.0f || force.y != 0.0f)
+    {
+        player->GetGdSprite()->AddImpulse(
+            XVec2{force.x * delta, force.y * delta});
+    }
+}
+
+void Game::OnSpriteCollisionEnter(Object_t src, Object_t dest)
+{
+    auto src_sprite = GetSprite(src);
+    auto dest_sprite = GetSprite(dest);
+    if(src_sprite &&dest_sprite){
+        std::cout<<"collisionEnter:"<<src_sprite->GetName()<<" "<<dest_sprite->GetName()<<std::endl;
+    }
+}
+
+void Game::OnSpriteTriggerEnter(Object_t src, Object_t dest)
+{
+    auto src_sprite = GetSprite(src);
+    auto dest_sprite = GetSprite(dest);
+    if(src_sprite &&dest_sprite){
+        std::cout<<"triggerEnter:"<<src_sprite->GetName()<<" "<<dest_sprite->GetName()<<std::endl;
+    }
+}
+
+void Game::OnSpriteTriggerExited(Object_t src, Object_t dest)
+{
+    auto src_sprite = GetSprite(src);
+    auto dest_sprite = GetSprite(dest);
+    if(src_sprite &&dest_sprite){
+        std::cout<<"triggerExited:"<<src_sprite->GetName()<<" "<<dest_sprite->GetName()<<std::endl;
+    }
+}
+
+void Game::OnSpriteScreenEntered(Object_t sprite_id)
+{
+    std::cout<<"OnSpriteScreenEntered:"<<sprite_id<<std::endl;
+    if(auto s = GetSprite(sprite_id)){
+        std::cout<<"sprite name:"<< s->GetName()<<std::endl;
+    }
+}
+
+void Game::OnSpriteScreenExited(Object_t sprite_id)
+{
+    std::cout<<"OnSpriteScreenExited:"<<sprite_id<<std::endl;
+    if(auto s = GetSprite(sprite_id)){
+        std::cout<<"sprite name:"<< s->GetName()<<std::endl;
+    }
 }
 
 sptr<ISprite> Game::GetSprite(const std::string &name)
@@ -253,6 +323,18 @@ sptr<ISprite> Game::GetSprite(const std::string &name)
     for (auto &s : mData->sprites)
     {
         if (s->GetName() == name)
+        {
+            return s;
+        }
+    }
+    return nullptr;
+}
+
+sptr<ISprite> Game::GetSprite(Object_t id)
+{
+    for (auto &s : mData->sprites)
+    {
+        if (s->GetGdSprite()->GetID() == id)
         {
             return s;
         }

@@ -318,3 +318,87 @@ void SpriteMgr::SetCollisionLayer(Object_t id, uint32_t layer)
         api.sprite_set_collision_layer(id, layer);
     }
 }
+
+void SpriteMgr::SetCollisionEnable(Object_t id,bool enable)
+{
+    if (id == 0) {
+        return;
+    }
+
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    if (api.sprite_set_collision_enabled != nullptr) {
+        api.sprite_set_collision_enabled(id, enable);
+    }
+}
+
+void SpriteMgr::SetTriggerEnable(Object_t id,bool enable)
+{
+    if (id == 0) {
+        return;
+    }
+
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    if (api.sprite_set_trigger_enabled != nullptr) {
+        api.sprite_set_trigger_enabled(id, enable);
+    }
+}
+
+void SpriteMgr::SetTriggerCircle(Object_t id,const XVec2 &center, float radius)
+{
+    if (id == 0) {
+        return;
+    }
+
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    if (api.sprite_set_trigger_circle != nullptr) {
+        api.sprite_set_trigger_circle(id, xutils::ToGdVec2(center),radius);
+    }
+}
+
+void SpriteMgr::SetTriggerRect(Object_t id,const XVec2 &center, const XVec2 &size)
+{
+    if (id == 0) {
+        return;
+    }
+
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    if (api.sprite_set_trigger_rect != nullptr) {
+        api.sprite_set_trigger_rect(id, xutils::ToGdVec2(center),xutils::ToGdVec2(size));
+    }
+}
+
+void SpriteMgr::SetTriggerCapsule(Object_t id,const XVec2 &center, const XVec2 &size)
+{
+    if (id == 0) {
+        return;
+    }
+
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    if (api.sprite_set_trigger_capsule != nullptr) {
+        api.sprite_set_trigger_capsule(id, xutils::ToGdVec2(center),xutils::ToGdVec2(size));
+    }
+}
+
+void SpriteMgr::SetTriggerMask(Object_t id,uint32_t mask)
+{
+    if (id == 0) {
+        return;
+    }
+
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    if (api.sprite_set_trigger_mask != nullptr) {
+        api.sprite_set_trigger_mask(id, mask);
+    }
+}
+
+void SpriteMgr::SetTriggerLayer(Object_t id,uint32_t layer)
+{
+    if (id == 0) {
+        return;
+    }
+
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    if (api.sprite_set_trigger_layer != nullptr) {
+        api.sprite_set_trigger_layer(id, layer);
+    }
+}

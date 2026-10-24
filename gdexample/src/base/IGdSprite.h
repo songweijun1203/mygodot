@@ -23,6 +23,14 @@ public:
     virtual void SetColliderCapsule(const XVec2 &center, const XVec2 &size) = 0;
     virtual void SetCollisionMask(uint32_t mask) = 0;
     virtual void SetCollisionLayer(uint32_t layer) = 0;
+    virtual void SetCollisionEnable(bool enablwe) =0;
+
+    virtual void SetTriggerEnable(bool enablwe) =0;
+    virtual void SetTriggerCircle(const XVec2 &center, float radius) = 0;
+    virtual void SetTriggerRect(const XVec2 &center, const XVec2 &size) = 0;
+    virtual void SetTriggerCapsule(const XVec2 &center, const XVec2 &size) = 0;
+    virtual void SetTriggerMask(uint32_t mask) = 0;
+    virtual void SetTriggerLayer(uint32_t layer) = 0;
 
     // 速度
     virtual void SetVelocity(const XVec2 &velocity) = 0;

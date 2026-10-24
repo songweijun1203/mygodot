@@ -193,3 +193,59 @@ void GdSprite::SetCollisionLayer(uint32_t layer)
         sprite_mgr->SetCollisionLayer(id, layer);
     }
 }
+
+void GdSprite::SetCollisionEnable(bool enable)
+{
+    if (auto sprite_mgr = GetSpriteMgr())
+    {
+        sprite_mgr->SetCollisionEnable(id, enable);
+    }
+}
+
+void GdSprite::SetTriggerEnable(bool enable)
+{
+    if (auto sprite_mgr = GetSpriteMgr())
+    {
+        sprite_mgr->SetTriggerEnable(id, enable);
+    }
+}
+
+void GdSprite::SetTriggerCircle(const XVec2 &center, float radius)
+{
+    if (auto sprite_mgr = GetSpriteMgr())
+    {
+        sprite_mgr->SetTriggerCircle(id, center,radius);
+    }
+}
+
+void GdSprite::SetTriggerRect(const XVec2 &center, const XVec2 &size)
+{
+    if (auto sprite_mgr = GetSpriteMgr())
+    {
+        sprite_mgr->SetTriggerRect(id, center,size);
+    }
+}
+
+void GdSprite::SetTriggerCapsule(const XVec2 &center, const XVec2 &size)
+{
+    if (auto sprite_mgr = GetSpriteMgr())
+    {
+        sprite_mgr->SetTriggerCapsule(id, center,size);
+    }
+}
+
+void GdSprite::SetTriggerMask(uint32_t mask)
+{
+    if (auto sprite_mgr = GetSpriteMgr())
+    {
+        sprite_mgr->SetTriggerMask(id, mask);
+    }
+}
+
+void GdSprite::SetTriggerLayer(uint32_t layer)
+{
+    if (auto sprite_mgr = GetSpriteMgr())
+    {
+        sprite_mgr->SetTriggerLayer(id, layer);
+    }
+}

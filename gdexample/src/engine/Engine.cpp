@@ -44,3 +44,38 @@ void Engine::OnEngineFixedUpdate(float delta)
         game->OnEngineFixedUpdate(delta);
     }
 }
+
+void Engine::OnSpriteCollisionEnter(Object_t src, Object_t dest)
+{
+    if(auto game = GetGame()){
+        game->OnSpriteCollisionEnter(src,dest);
+    }
+}
+
+void Engine::OnSpriteTriggerEnter(Object_t src, Object_t dest)
+{
+    if(auto game = GetGame()){
+        game->OnSpriteTriggerEnter(src,dest);
+    }
+}
+
+void Engine::OnSpriteTriggerExited(Object_t src, Object_t dest)
+{
+    if(auto game = GetGame()){
+        game->OnSpriteTriggerExited(src,dest);
+    }
+}
+
+void Engine::OnSpriteScreenEntered(Object_t sprite_id)
+{
+     if(auto game = GetGame()){
+        game->OnSpriteScreenEntered(sprite_id);
+    }
+}
+
+void Engine::OnSpriteScreenExited(Object_t sprite_id)
+{
+     if(auto game = GetGame()){
+        game->OnSpriteScreenExited(sprite_id);
+    }
+}

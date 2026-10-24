@@ -106,10 +106,12 @@ void GDCallBackHandler::func_on_sprite_vfx_finished(spx_api::GdInt obj)
 
 void GDCallBackHandler::func_on_sprite_screen_exited(spx_api::GdInt obj)
 {
+	DataManger::getInstance().getEngine()->OnSpriteScreenExited(obj);
 }
 
 void GDCallBackHandler::func_on_sprite_screen_entered(spx_api::GdInt obj)
 {
+	DataManger::getInstance().getEngine()->OnSpriteScreenEntered(obj);
 }
 
 void GDCallBackHandler::func_on_mouse_pressed(spx_api::GdInt keyid)
@@ -148,6 +150,7 @@ void GDCallBackHandler::func_on_axis_changed(spx_api::GdString action_name, spx_
 
 void GDCallBackHandler::func_on_collision_enter(spx_api::GdInt self_id, spx_api::GdInt other_id)
 {
+	DataManger::getInstance().getEngine()->OnSpriteCollisionEnter(self_id, other_id);
 }
 
 void GDCallBackHandler::func_on_collision_stay(spx_api::GdInt self_id, spx_api::GdInt other_id)
@@ -160,6 +163,7 @@ void GDCallBackHandler::func_on_collision_exit(spx_api::GdInt self_id, spx_api::
 
 void GDCallBackHandler::func_on_trigger_enter(spx_api::GdInt self_id, spx_api::GdInt other_id)
 {
+	DataManger::getInstance().getEngine()->OnSpriteTriggerEnter(self_id, other_id);
 }
 void GDCallBackHandler::func_on_trigger_stay(spx_api::GdInt self_id, spx_api::GdInt other_id)
 {
@@ -167,6 +171,7 @@ void GDCallBackHandler::func_on_trigger_stay(spx_api::GdInt self_id, spx_api::Gd
 
 void GDCallBackHandler::func_on_trigger_exit(spx_api::GdInt self_id, spx_api::GdInt other_id)
 {
+	DataManger::getInstance().getEngine()->OnSpriteTriggerExited(self_id, other_id);
 }
 
 void GDCallBackHandler::func_on_ui_ready(spx_api::GdInt obj)

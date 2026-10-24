@@ -20,6 +20,14 @@ public:
     void SetColliderCapsule(const XVec2 &center, const XVec2 &size)override;
     void SetCollisionMask(uint32_t mask)override;
     void SetCollisionLayer(uint32_t layer)override;
+    void SetCollisionEnable(bool enablwe) override;
+
+    void SetTriggerEnable(bool enablwe) override;
+    void SetTriggerCircle(const XVec2 &center, float radius) override;
+    void SetTriggerRect(const XVec2 &center, const XVec2 &size) override;
+    void SetTriggerCapsule(const XVec2 &center, const XVec2 &size) override;
+    void SetTriggerMask(uint32_t mask) override;
+    void SetTriggerLayer(uint32_t layer) override;
 
     // 速度
     void SetVelocity(const XVec2 &velocity)override;
