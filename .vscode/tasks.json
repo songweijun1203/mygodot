@@ -1,0 +1,77 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // 默认构建任务：编译带调试符号、未优化的 Godot + SPX 编辑器。
+    {
+      "label": "SPX: build debug editor",
+      "type": "shell",
+      "command": "make",
+      "args": ["build-debug"],
+      "options": {
+        "cwd": "${workspaceFolder:mygodot}"
+      },
+      "problemMatcher": "$gcc",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    // 运行 SPX 测试；该任务会先通过 build-debug 确保测试二进制是最新的。
+    {
+      "label": "SPX: run tests",
+      "type": "shell",
+      "command": "make",
+      "args": ["test-spx"],
+      "options": {
+        "cwd": "${workspaceFolder:mygodot}"
+      },
+      "problemMatcher": "$gcc"
+    },
+    // 直接运行已有的 Debug 编辑器，不编译，也不附加调试器。
+    {
+      "label": "SPX: run editor without rebuilding",
+      "type": "shell",
+      "command": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--editor",
+        "--path",
+        "${workspaceFolder:mygodot}/debug_project"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder:mygodot}"
+      },
+      "problemMatcher": []
+    },
+    // 直接运行 05-Animation 教程，不编译，也不附加 LLDB。
+    {
+      "label": "SPX: run 05-Animation without rebuilding",
+      "type": "shell",
+      "command": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--path",
+        "${workspaceFolder:mygodot}/../spx/tutorial/05-Animation/project"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder:mygodot}"
+      },
+      "problemMatcher": []
+    },
+    // 编译 gdexample 的 Debug GDExtension，并保留 DWARF 调试信息。
+    {
+      "label": "GdExample: build debug extension",
+      "type": "shell",
+      "command": "scons",
+      "args": [
+        "platform=macos",
+        "target=template_debug",
+        "arch=arm64",
+        "debug_symbols=yes",
+        "optimize=debug"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder:mygodot}/gdexample"
+      },
+      "problemMatcher": "$gcc"
+    }
+  ]
+}

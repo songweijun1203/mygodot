@@ -1,0 +1,23 @@
+{
+  "folders": [
+    {
+      "name": "mygodot",
+      "path": "."
+    },
+    {
+      "name": "Godot Engine",
+      "path": "godot"
+    },
+    {
+      "name": "SPX",
+      "path": "../spx"
+    }
+  ],
+  "settings": {
+    "C_Cpp.default.configurationProvider": "ms-vscode.cpptools",
+    "files.exclude": {
+      "**/.spx-build": true,
+      "**/.sconsign*.dblite": true
+    }
+  }
+}

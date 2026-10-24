@@ -1,0 +1,194 @@
+{
+  "version": "0.2.0",
+  // 启动调试时可从这里选择项目目录，无需修改下面的调试配置。
+  "inputs": [
+    {
+      "id": "spxProjectPath",
+      "type": "pickString",
+      "description": "选择要调试的 SPX 项目",
+      "options": [
+        {
+          "label": "SPX 00-Hello",
+          "value": "${workspaceFolder:mygodot}/../spx/tutorial/00-Hello/project"
+        },
+        {
+          "label": "SPX 01-Weather",
+          "value": "${workspaceFolder:mygodot}/../spx/tutorial/01-Weather/project"
+        },
+        {
+          "label": "SPX 04-Bullet",
+          "value": "${workspaceFolder:mygodot}/../spx/tutorial/04-Bullet/project"
+        },
+        {
+          "label": "SPX 05-Animation",
+          "value": "${workspaceFolder:mygodot}/../spx/tutorial/05-Animation/project"
+        },
+        {
+          "label": "mygodot debug_project",
+          "value": "${workspaceFolder:mygodot}/debug_project"
+        }
+      ],
+      "default": "${workspaceFolder:mygodot}/../spx/tutorial/05-Animation/project"
+    },
+    {
+      "id": "spxCustomProjectPath",
+      "type": "promptString",
+      "description": "输入要调试的 Godot 项目目录（目录中必须有 project.godot）",
+      "default": "${workspaceFolder:mygodot}/../spx/tutorial/05-Animation/project"
+    }
+  ],
+  "configurations": [
+    // 默认调试入口：启动前先执行构建任务，确保二进制和调试符号是最新的。
+    {
+      "name": "SPX: Debug editor",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--editor",
+        "--path",
+        "${workspaceFolder:mygodot}/debug_project"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb",
+      "preLaunchTask": "SPX: build debug editor"
+    },
+    // 仅启动 LLDB，不执行构建；适合已经完成编译后的重复调试。
+    {
+      "name": "SPX: Debug editor (no build)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--editor",
+        "--path",
+        "${workspaceFolder:mygodot}/debug_project"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+    {
+      "name": "SPX: Debug game (no build)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--path",
+        "${workspaceFolder:mygodot}/debug_project"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+
+    // 调试 SPX 教程 05-Animation；启动前重编当前工作区的 C++ 引擎。
+    // 教程项目会加载 SPX 生成的 gdspx-darwin-arm64.dylib，SpxSprite
+    // 本身则来自当前 Godot + godot_modules/spx 调试二进制。
+    {
+      "name": "SPX: Debug 05-Animation",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--path",
+        "${workspaceFolder:mygodot}/../spx/tutorial/05-Animation/project"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb",
+      "preLaunchTask": "SPX: build debug editor"
+    },
+
+    // 只附加调试器，不重编；适合反复运行教程并观察 C++ 断点。
+    {
+      "name": "SPX: Debug 05-Animation (no build)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--path",
+        "${workspaceFolder:mygodot}/../spx/tutorial/05-Animation/project"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+
+    // 启动时用下拉框选择已有项目；不重编译当前 Godot 调试二进制。
+    {
+      "name": "SPX: Debug selected project (no build)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--path",
+        "${input:spxProjectPath}"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+
+    // 如果项目不在下拉列表中，可在启动时直接输入项目目录。
+    {
+      "name": "SPX: Debug custom project (no build)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--path",
+        "${input:spxCustomProjectPath}"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb"
+    },
+
+    // 只调试 SPX 输入代理相关的单元测试，不启动编辑器界面。
+    {
+      "name": "SPX: Debug input proxy tests",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--headless",
+        "--path",
+        "${workspaceFolder:mygodot}/debug_project",
+        "--test",
+        "--test-case=*Input proxy*"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder:mygodot}",
+      "externalConsole": false,
+      "MIMode": "lldb",
+      "preLaunchTask": "SPX: build debug editor"
+    },
+
+    // 先生成带 DWARF 调试信息的 GDExtension，再启动测试场景。
+    {
+      "name": "GdExample: Debug",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder:mygodot}/godot/bin/godot.macos.editor.dev.arm64.spx-debug",
+      "args": [
+        "--path",
+        "${workspaceFolder:mygodot}/gdexample/project"
+      ],
+      "cwd": "${workspaceFolder:mygodot}/gdexample",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "MIMode": "lldb",
+      //"preLaunchTask": "GdExample: build debug extension"
+    }
+
+  ]
+}

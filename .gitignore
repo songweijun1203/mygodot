@@ -1,4 +1,6 @@
 godot_modules/
+godot/
 .DS_Store
 .spx-build/
+.godot/
 .vscode/*.local.json
