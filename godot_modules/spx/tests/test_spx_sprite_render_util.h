@@ -1,0 +1,560 @@
+/**************************************************************************/
+/*  test_spx_sprite_render_util.h                                         */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#ifndef TEST_SPX_SPRITE_RENDER_UTIL_H
+#define TEST_SPX_SPRITE_RENDER_UTIL_H
+
+#include "../spx_camera_mgr.h"
+#include "../spx_collision_debug_overlay.h"
+#include "scene/2d/physics/collision_shape_2d.h"
+#include "../spx_engine.h"
+#include "../spx_pixel_query.h"
+#include "../spx_res_mgr.h"
+#include "../spx_sprite.h"
+#include "../spx_sprite_mgr.h"
+#include "../spx_sprite_render_util.h"
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
+#include "core/io/json.h"
+#include "scene/2d/animated_sprite_2d.h"
+#include "scene/main/scene_tree.h"
+#include "scene/main/window.h"
+#include "servers/audio_server.h"
+#include "scene/resources/image_texture.h"
+#include "tests/test_macros.h"
+#include "tests/test_utils.h"
+
+namespace TestSpxSpriteRenderUtil {
+
+TEST_CASE("[SPX] Render root preserves single-image render offset") {
+	const Vector2 render_offset(12.0, -8.0);
+	const Vector2 base_offset(1.0, 2.0);
+	const Vector2 frame_offset(3.0, 4.0);
+	const Vector2 render_scale(2.0, 0.5);
+
+	const Vector2 anim_offset = spx_compute_anim_offset(true, base_offset, render_offset, frame_offset, render_scale);
+	CHECK(render_offset + anim_offset == render_offset + base_offset + frame_offset * render_scale);
+}
+
+TEST_CASE("[SPX] Render root cancels costume offset for animation frames") {
+	const Vector2 render_offset(12.0, -8.0);
+	const Vector2 base_offset(1.0, 2.0);
+	const Vector2 frame_offset(3.0, 4.0);
+	const Vector2 render_scale(2.0, 0.5);
+
+	const Vector2 anim_offset = spx_compute_anim_offset(false, base_offset, render_offset, frame_offset, render_scale);
+	CHECK(render_offset + anim_offset == base_offset + frame_offset * render_scale);
+}
+
+TEST_CASE("[SceneTree][SPX] Animation frame UV rect is normalized from its atlas") {
+	const Ref<Image> image = memnew(Image(200, 100, false, Image::FORMAT_RGBA8));
+	const Ref<ImageTexture> texture = ImageTexture::create_from_image(image);
+	Ref<AtlasTexture> atlas_frame;
+	atlas_frame.instantiate();
+	atlas_frame->set_atlas(texture);
+	atlas_frame->set_region(Rect2(20, 10, 40, 30));
+
+	Ref<SpriteFrames> frames;
+	frames.instantiate();
+	frames->add_frame("default", atlas_frame);
+
+	const Rect2 uv_rect = spx_get_animation_frame_uv_rect(frames, "default", 0);
+	CHECK(uv_rect.position.x == doctest::Approx(0.1));
+	CHECK(uv_rect.position.y == doctest::Approx(0.1));
+	CHECK(uv_rect.size.x == doctest::Approx(0.2));
+	CHECK(uv_rect.size.y == doctest::Approx(0.3));
+}
+
+TEST_CASE("[SPX] Animation frame UV rect falls back for non-atlas frames") {
+	Ref<SpriteFrames> frames;
+	frames.instantiate();
+	Ref<Texture2D> plain_texture;
+	plain_texture.instantiate();
+	frames->add_frame("default", plain_texture);
+
+	const Rect2 default_uv(0, 0, 1, 1);
+	CHECK(spx_get_animation_frame_uv_rect(frames, "missing", 0) == default_uv);
+	CHECK(spx_get_animation_frame_uv_rect(frames, "default", 0) == default_uv);
+}
+
+// Only the managers used by visual operations are awakened. This exercises
+// real SpxSprite entry points without starting the Go runtime or recorder.
+struct VisualFixture {
+	Node2D *root = nullptr;
+	SpxResMgr *resources = nullptr;
+	SpxSpriteMgr *sprites = nullptr;
+	String png_path = TestUtils::get_temp_path("spx_visual.png");
+	String svg_path = TestUtils::get_temp_path("spx_visual.svg");
+	String retry_path = TestUtils::get_temp_path("spx_visual_retry.svg");
+
+	VisualFixture() {
+		SpxEngine::register_callbacks(nullptr);
+		SpxEngine *engine = SpxEngine::get_singleton();
+		root = memnew(Node2D);
+		SceneTree::get_singleton()->get_root()->add_child(root);
+		engine->set_root_node(SceneTree::get_singleton(), root);
+		engine->get_camera()->on_awake();
+		resources = engine->get_res();
+		resources->on_awake();
+		sprites = engine->get_sprite();
+		sprites->on_awake();
+		Ref<Image> image = Image::create_empty(8, 6, false, Image::FORMAT_RGBA8);
+		image->fill(Color(1, 0, 0));
+		CHECK(image->save_png(png_path) == OK);
+		write_svg(svg_path);
+		write_text(retry_path, "invalid SVG");
+	}
+
+	~VisualFixture() {
+		SpxEngine::shutdown();
+		memdelete(root);
+		DirAccess::remove_absolute(png_path);
+		DirAccess::remove_absolute(svg_path);
+		DirAccess::remove_absolute(retry_path);
+	}
+
+	static void write_text(const String &p_path, const String &p_text) {
+		Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE);
+		REQUIRE(file.is_valid());
+		file->store_string(p_text);
+	}
+
+	static void write_svg(const String &p_path) {
+		write_text(
+				p_path,
+				"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" "
+				"height=\"6\"><rect width=\"8\" height=\"6\" fill=\"red\"/></svg>");
+	}
+
+	void create_clip(const char *p_name, const String &p_first,
+			const String &p_second, int p_bitmap = 1) {
+		Array frames;
+		for (const String &path : { p_first, p_second }) {
+			Dictionary frame;
+			frame["path"] = path;
+			frame["bitmap"] = p_bitmap;
+			Array offset;
+			offset.push_back(4);
+			offset.push_back(6);
+			frame["offset"] = offset;
+			frames.push_back(frame);
+		}
+		Dictionary payload;
+		payload["frames"] = frames;
+		payload["max_bitmap"] = 1;
+		const CharString json = JSON::stringify(payload).utf8();
+		resources->create_animation("ReviewSprite", p_name, json.get_data(), 10,
+				false);
+	}
+
+	SpxSprite *create_sprite() {
+		SpxSprite *sprite =
+				sprites->get_sprite(sprites->create_bare_sprite(Vector2()));
+		sprite->set_type_name("ReviewSprite");
+		return sprite;
+	}
+};
+
+TEST_CASE("[SceneTree][SPX] Fractional SVG render bounds and pixel queries share logical geometry") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	VisualFixture::write_text(fixture.svg_path, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10.75\" height=\"6.25\"><rect width=\"100%\" height=\"100%\" fill=\"red\"/></svg>");
+	const CharString path = fixture.svg_path.utf8();
+	CHECK(fixture.resources->get_image_size(path.get_data()) == Vector2(11, 7));
+	CHECK(fixture.resources->get_image_logical_size(path.get_data()) == Vector2(10.75, 6.25));
+	const Rect2 alpha = fixture.resources->get_bound_from_alpha(path.get_data());
+	CHECK(alpha.position == Vector2());
+	CHECK(alpha.size == Vector2(10.75, 6.25));
+	SpxSprite *sprite = fixture.create_sprite();
+	sprite->set_texture(path.get_data());
+	for (float scale : { 1.0f, 2.0f, 3.0f, 8.0f, 0.5f }) {
+		sprite->set_render_scale(Vector2(scale, scale));
+		// Asset pivot (2, 3), measured from the top-left.
+		sprite->set_render_offset(Vector2(3.375, 0.125) * scale);
+		SpxPixelQuery::Snapshot query;
+		REQUIRE(SpxPixelQuery::capture(sprite->get_anim2d(), false, query));
+		CHECK(query.bounds.position.is_equal_approx(Vector2(-2, -3) * scale));
+		CHECK(query.bounds.size.is_equal_approx(Vector2(10.75, 6.25) * scale));
+		REQUIRE(SpxPixelQuery::load_image(query));
+		Color color;
+		CHECK(SpxPixelQuery::sample(query, query.bounds.get_center(), color));
+		CHECK(color.r == doctest::Approx(1));
+		CHECK(color.a == doctest::Approx(1));
+		CHECK_FALSE(SpxPixelQuery::sample(query, query.bounds.position - Vector2(0.01, 0), color));
+	}
+
+	// Pixel APIs and atlas regions retain their existing units.
+	sprite->set_texture_atlas(path.get_data(), Rect2(1, 2, 4, 3));
+	sprite->set_render_scale(Vector2(1, 1));
+	SpxPixelQuery::Snapshot atlas;
+	REQUIRE(SpxPixelQuery::capture(sprite->get_anim2d(), false, atlas));
+	CHECK(atlas.bounds.size == Vector2(4, 3));
+	const CharString png_path = fixture.png_path.utf8();
+	CHECK(fixture.resources->get_image_logical_size(png_path.get_data()) == Vector2(8, 6));
+}
+
+TEST_CASE("[SceneTree][SPX] SVG frame changes and reloads retain fractional logical dimensions") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	VisualFixture::write_text(fixture.svg_path, "<svg width=\"10.75\" height=\"6.25\"><rect width=\"100%\" height=\"100%\"/></svg>");
+	VisualFixture::write_text(fixture.retry_path, "<svg width=\"17.125\" height=\"9.75\"><rect width=\"100%\" height=\"100%\"/></svg>");
+	fixture.create_clip("fractional", fixture.svg_path, fixture.retry_path);
+	SpxSprite *sprite = fixture.create_sprite();
+	sprite->set_render_scale(Vector2(3, 3));
+	sprite->play_anim("fractional", 1, false, false);
+	SpxPixelQuery::Snapshot query;
+	REQUIRE(SpxPixelQuery::capture(sprite->get_anim2d(), false, query));
+	CHECK(query.bounds.size.is_equal_approx(Vector2(10.75, 6.25) * 3));
+	sprite->set_anim_frame(1);
+	REQUIRE(SpxPixelQuery::capture(sprite->get_anim2d(), false, query));
+	CHECK(query.bounds.size.is_equal_approx(Vector2(17.125, 9.75) * 3));
+	const Ref<Texture2D> texture = query.texture;
+
+	VisualFixture::write_text(fixture.retry_path, "<svg width=\"12.5\" height=\"10.25\"><rect width=\"100%\" height=\"100%\"/></svg>");
+	const CharString path = fixture.retry_path.utf8();
+	fixture.resources->reload_texture(path.get_data());
+	REQUIRE(SpxPixelQuery::capture(sprite->get_anim2d(), false, query));
+	CHECK(query.texture == texture);
+	CHECK(query.bounds.size.is_equal_approx(Vector2(12.5, 10.25) * 3));
+	CHECK(fixture.resources->get_image_logical_size(path.get_data()) == Vector2(12.5, 10.25));
+	VisualFixture::write_text(fixture.retry_path, "invalid SVG");
+	ERR_PRINT_OFF
+	fixture.resources->reload_texture(path.get_data());
+	ERR_PRINT_ON
+	REQUIRE(SpxPixelQuery::capture(sprite->get_anim2d(), false, query));
+	CHECK(query.bounds.size.is_equal_approx(Vector2(12.5, 10.25) * 3));
+}
+
+TEST_CASE("[SceneTree][SPX] Animation players isolate loop metadata and share "
+		  "textures") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	fixture.create_clip("walk", fixture.png_path, fixture.png_path);
+	const Ref<SpriteFrames> shared =
+			fixture.resources->get_animation_frames("ReviewSprite::walk");
+	REQUIRE(shared.is_valid());
+	SpxSprite *first = fixture.create_sprite();
+	SpxSprite *second = fixture.create_sprite();
+	first->play_anim("walk", 1, false, false);
+	second->play_anim("walk", 1, true, false);
+	const Ref<SpriteFrames> first_frames =
+			first->get_anim2d()->get_sprite_frames();
+	const Ref<SpriteFrames> second_frames =
+			second->get_anim2d()->get_sprite_frames();
+	CHECK(first_frames != second_frames);
+	CHECK(first_frames != shared);
+	CHECK_FALSE(first_frames->get_animation_loop("ReviewSprite::walk"));
+	CHECK(second_frames->get_animation_loop("ReviewSprite::walk"));
+	CHECK(shared->get_animation_loop("ReviewSprite::walk"));
+	CHECK(first_frames->get_frame_texture("ReviewSprite::walk", 0) ==
+			shared->get_frame_texture("ReviewSprite::walk", 0));
+	CHECK(second_frames->get_frame_texture("ReviewSprite::walk", 0) ==
+			shared->get_frame_texture("ReviewSprite::walk", 0));
+	CHECK_EQ(first_frames->get_animation_names().size(), 1);
+	first->get_anim2d()->set_frame_and_progress(1, 0.4);
+	first->play_anim("walk", 2, false, false);
+	CHECK(first->get_anim2d()->get_sprite_frames() == first_frames);
+	CHECK_EQ(first->get_anim_frame(), 1);
+	CHECK(first->get_anim2d()->get_frame_progress() == doctest::Approx(0.4));
+	first->play_backwards_anim("walk");
+	CHECK_FALSE(first_frames->get_animation_loop("ReviewSprite::walk"));
+	CHECK(second_frames->get_animation_loop("ReviewSprite::walk"));
+}
+
+TEST_CASE("[SceneTree][SPX] Animation creation publishes complete clips and "
+		  "retries failures") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	ERR_PRINT_OFF
+	fixture.create_clip("retry", fixture.svg_path, fixture.retry_path);
+	ERR_PRINT_ON
+	CHECK(fixture.resources->get_animation_frames("ReviewSprite::retry").is_null());
+	CHECK_FALSE(fixture.resources->is_dynamic_anim_mode());
+	CHECK_FALSE(fixture.resources->is_svg_animation("ReviewSprite::retry"));
+	VisualFixture::write_svg(fixture.retry_path);
+	fixture.create_clip("retry", fixture.svg_path, fixture.retry_path);
+	const Ref<SpriteFrames> frames =
+			fixture.resources->get_animation_frames("ReviewSprite::retry");
+	REQUIRE(frames.is_valid());
+	CHECK_EQ(frames->get_frame_count("ReviewSprite::retry"), 2);
+	CHECK(fixture.resources->is_svg_animation("ReviewSprite::retry"));
+	CHECK(fixture.resources->get_animation_frame_offset("ReviewSprite::retry",
+				  1) == Vector2(4, 6));
+	CHECK(fixture.resources->get_animation_frames("ReviewSprite::missing").is_null());
+
+	ERR_PRINT_OFF
+	fixture.create_clip("mixed", fixture.svg_path, fixture.png_path);
+	fixture.create_clip("zero", fixture.png_path, fixture.png_path, 0);
+	ERR_PRINT_ON
+	CHECK(fixture.resources->get_animation_frames("ReviewSprite::mixed").is_null());
+	CHECK(fixture.resources->get_animation_frames("ReviewSprite::zero").is_null());
+	fixture.create_clip("mixed", fixture.png_path, fixture.png_path);
+	CHECK(fixture.resources->get_animation_frames("ReviewSprite::mixed").is_valid());
+}
+
+TEST_CASE("[SceneTree][SPX] Visual switches commit raster scale for forward "
+		  "and backward playback") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	fixture.create_clip("svg", fixture.svg_path, fixture.svg_path);
+	fixture.create_clip("bitmap", fixture.png_path, fixture.png_path);
+	SpxSprite *sprite = fixture.create_sprite();
+	const CharString png_path = fixture.png_path.utf8();
+	sprite->set_texture(png_path.get_data());
+	sprite->set_render_scale(Vector2(2, 2));
+	sprite->play_anim("svg", 1.75, false, false);
+	CHECK(sprite->get_anim2d()->get_scale() == Vector2(1, 1));
+	CHECK(sprite->get_anim2d()
+					->get_sprite_frames()
+					->get_frame_texture("ReviewSprite::svg", 0)
+					->get_size() == Vector2(16, 12));
+	sprite->play_backwards_anim("bitmap");
+	CHECK(sprite->get_anim2d()->get_scale() == Vector2(2, 2));
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	CHECK(sprite->get_anim_playing_speed() == doctest::Approx(-1));
+	sprite->play_backwards_anim("svg");
+	CHECK(sprite->get_anim2d()->get_scale() == Vector2(1, 1));
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	sprite->set_anim("bitmap");
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	CHECK(sprite->get_anim_playing_speed() == doctest::Approx(-1));
+	sprite->set_anim("svg");
+
+	sprite->get_anim2d()->set_frame_and_progress(1, 0.4);
+	sprite->pause_anim();
+	sprite->set_anim_speed_scale(0);
+	sprite->set_render_scale(Vector2(4, 4));
+	CHECK_FALSE(sprite->is_playing_anim());
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	CHECK(sprite->get_anim2d()->get_frame_progress() == doctest::Approx(0.4));
+	CHECK(sprite->get_anim2d()->get_scale() == Vector2(1, 1));
+	CHECK(sprite->get_anim2d()
+					->get_sprite_frames()
+					->get_frame_texture("ReviewSprite::svg", 0)
+					->get_size() == Vector2(32, 24));
+}
+
+TEST_CASE("[SceneTree][SPX] Failed visual preparation preserves source and "
+		  "actual raster scale") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	fixture.create_clip("svg", fixture.svg_path, fixture.svg_path);
+	SpxSprite *sprite = fixture.create_sprite();
+	sprite->play_anim("svg", 1, false, false);
+	const Ref<SpriteFrames> original = sprite->get_anim2d()->get_sprite_frames();
+	sprite->get_anim2d()->set_frame_and_progress(1, 0.4);
+	const CharString broken_path = fixture.retry_path.utf8();
+	const CharString broken_bitmap = fixture.png_path.utf8();
+	VisualFixture::write_text(fixture.png_path, "invalid PNG");
+	ERR_PRINT_OFF
+	sprite->set_texture(broken_bitmap.get_data());
+	sprite->set_texture(broken_path.get_data());
+	sprite->play_anim("missing", 1, true, false);
+	sprite->play_backwards_anim("missing");
+	ERR_PRINT_ON
+	CHECK(sprite->get_anim2d()->get_sprite_frames() == original);
+	CHECK(sprite->get_anim2d()->get_animation() ==
+			StringName("ReviewSprite::svg"));
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	CHECK(sprite->is_playing_anim());
+	CHECK_FALSE(original->get_animation_loop("ReviewSprite::svg"));
+
+	// The cached 1x source stays valid while the requested 2x source fails.
+	VisualFixture::write_text(fixture.svg_path, "invalid SVG");
+	ERR_PRINT_OFF
+	sprite->set_render_scale(Vector2(2, 2));
+	ERR_PRINT_ON
+	CHECK(sprite->get_anim2d()->get_sprite_frames() == original);
+	CHECK(sprite->get_anim2d()->get_scale() == Vector2(2, 2));
+	VisualFixture::write_svg(fixture.svg_path);
+	sprite->set_render_scale(Vector2(2, 2));
+	CHECK(sprite->get_anim2d()->get_sprite_frames() != original);
+	CHECK(sprite->get_anim2d()->get_scale() == Vector2(1, 1));
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	CHECK(sprite->get_anim2d()->get_frame_progress() == doctest::Approx(0.4));
+	CHECK_FALSE(sprite->get_anim2d()->get_sprite_frames()->get_animation_loop(
+			"ReviewSprite::svg"));
+}
+
+TEST_CASE("[SceneTree][SPX] Texture reload normalizes paths and preserves "
+		  "existing references on failure") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	fixture.resources->set_game_datas(fixture.png_path.get_base_dir(),
+			Vector<String>());
+	const Ref<Texture2D> texture =
+			fixture.resources->load_texture("spx_visual.png");
+	REQUIRE(texture.is_valid());
+	CHECK(texture->is_pixel_opaque(0, 0));
+	SpxPixelQuery::ImageCache images;
+	SpxPixelQuery::Snapshot before_png;
+	before_png.texture = texture;
+	REQUIRE(SpxPixelQuery::load_image(before_png, &images));
+	Ref<Image> replacement =
+			Image::create_empty(12, 10, false, Image::FORMAT_RGBA8);
+	replacement->fill(Color(0, 0, 1));
+	replacement->set_pixel(1, 0, Color(0, 0, 1, 0));
+	REQUIRE(replacement->save_png(fixture.png_path) == OK);
+	fixture.resources->reload_texture("spx_visual.png");
+	CHECK(texture == fixture.resources->load_texture("spx_visual.png"));
+	CHECK(texture->get_size() == Vector2(12, 10));
+	CHECK(texture->get_image()->get_pixel(0, 0) == Color(0, 0, 1));
+	SpxPixelQuery::Snapshot after_png;
+	after_png.texture = texture;
+	REQUIRE(SpxPixelQuery::load_image(after_png, &images));
+	CHECK(after_png.image->get_pixel(0, 0) == Color(0, 0, 1));
+	CHECK_FALSE(texture->is_pixel_opaque(1, 0));
+	VisualFixture::write_text(fixture.png_path, "invalid PNG");
+	ERR_PRINT_OFF
+	fixture.resources->reload_texture("spx_visual.png");
+	ERR_PRINT_ON
+	CHECK(texture->get_size() == Vector2(12, 10));
+	CHECK(texture->get_image()->get_pixel(0, 0) == Color(0, 0, 1));
+
+	SpxSprite *sprite = fixture.create_sprite();
+	sprite->set_render_scale(Vector2(2, 2));
+	sprite->set_texture("spx_visual.svg");
+	const Ref<Texture2D> svg_texture =
+			sprite->get_anim2d()->get_sprite_frames()->get_frame_texture("default",
+					0);
+	REQUIRE(svg_texture.is_valid());
+	SpxPixelQuery::Snapshot before_svg;
+	before_svg.texture = svg_texture;
+	REQUIRE(SpxPixelQuery::load_image(before_svg, &images));
+	VisualFixture::write_text(
+			fixture.svg_path,
+			"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" "
+			"height=\"10\"><rect width=\"12\" height=\"10\" fill=\"blue\"/></svg>");
+	fixture.resources->reload_texture("spx_visual.svg");
+	CHECK(svg_texture ==
+			sprite->get_anim2d()->get_sprite_frames()->get_frame_texture("default",
+					0));
+	CHECK(svg_texture->get_size() == Vector2(24, 20));
+	CHECK(svg_texture->get_image()->get_pixel(0, 0) == Color(0, 0, 1));
+	SpxPixelQuery::Snapshot after_svg;
+	after_svg.texture = svg_texture;
+	REQUIRE(SpxPixelQuery::load_image(after_svg, &images));
+	CHECK(after_svg.image->get_pixel(0, 0) == Color(0, 0, 1));
+	VisualFixture::write_text(fixture.svg_path, "invalid SVG");
+	ERR_PRINT_OFF
+	fixture.resources->reload_texture("spx_visual.svg");
+	ERR_PRINT_ON
+	CHECK(svg_texture->get_size() == Vector2(24, 20));
+}
+
+TEST_CASE("[SceneTree][SPX] Color sensing filters the source and excludes it from the scene") {
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	fixture.resources->set_game_datas(fixture.png_path.get_base_dir(), Vector<String>());
+	SpxSprite *self = fixture.create_sprite();
+	self->set_texture("spx_visual.png");
+
+	Ref<Image> blue = Image::create_empty(8, 6, false, Image::FORMAT_RGBA8);
+	blue->fill(Color(0, 0, 1));
+	Ref<SpriteFrames> frames;
+	frames.instantiate();
+	frames->add_frame("default", ImageTexture::create_from_image(blue));
+	SpxSprite *other = fixture.create_sprite();
+	other->get_anim2d()->set_sprite_frames(frames);
+
+	const GdObj id = self->get_gid();
+	CHECK(fixture.sprites->check_collision_by_color(id, Color(0, 0, 1), 0.01, 0.99));
+	CHECK_FALSE(fixture.sprites->check_collision_by_color(id, Color(1, 0, 0), 0.01, 0.99));
+	CHECK(fixture.sprites->check_collision_by_colors(id, Color(1, 0, 0), Color(0, 0, 1), 0.01, 0.99));
+	CHECK_FALSE(fixture.sprites->check_collision_by_colors(id, Color(0, 1, 0), Color(0, 0, 1), 0.01, 0.99));
+	CHECK_FALSE(fixture.sprites->check_collision_by_colors(id, Color(1, 0, 0), Color(0, 0, 1), 0.0, 0.99));
+	CHECK_FALSE(fixture.sprites->check_collision_by_colors(id, Color(1, 0, 0), Color(0, 0, 1), 0.01, 1.0));
+	other->hide();
+	CHECK_FALSE(fixture.sprites->check_collision_by_color(id, Color(0, 0, 1), 0.01, 0.99));
+}
+
+TEST_CASE("[SceneTree][SPX] Scene animation libraries survive cloning and preserve from-end playback") {
+	// The SceneTree listener returns before Audio initialization. Cloning Area2D
+	// enumerates audio bus properties; the listener owns AudioServer teardown.
+	REQUIRE(AudioServer::get_singleton() == nullptr);
+	AudioDriverManager::initialize(AudioDriverManager::get_driver_count() - 1);
+	AudioServer *audio_server = memnew(AudioServer);
+	audio_server->init();
+	REQUIRE_FALSE(SpxEngine::is_initialized());
+	VisualFixture fixture;
+	Ref<SpriteFrames> authored;
+	authored.instantiate();
+	authored->remove_animation("default");
+	const Ref<Texture2D> texture = fixture.resources->load_texture(fixture.png_path);
+	for (const char *name : { "idle", "walk" }) {
+		authored->add_animation(name);
+		authored->add_frame(name, texture);
+		authored->add_frame(name, texture);
+	}
+	SpxSprite *sprite = fixture.create_sprite();
+	sprite->get_anim2d()->set_sprite_frames(authored);
+	sprite->on_start();
+	sprite->play_anim("idle", 1, false, false);
+	const Ref<SpriteFrames> private_frames = sprite->get_anim2d()->get_sprite_frames();
+	sprite->play_anim("walk", 1, false, true);
+	CHECK(sprite->get_anim2d()->get_sprite_frames() == private_frames);
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	CHECK(sprite->get_anim2d()->get_frame_progress() == doctest::Approx(1));
+	CHECK_FALSE(private_frames->get_animation_loop("idle"));
+	sprite->set_anim_speed_scale(-1);
+	sprite->play_backwards_anim("idle");
+	CHECK_EQ(sprite->get_anim_frame(), 1);
+	CHECK(sprite->get_anim2d()->get_frame_progress() == doctest::Approx(1));
+	CHECK(sprite->get_anim_playing_speed() == doctest::Approx(1));
+	SpxSprite *clone = fixture.sprites->get_sprite(fixture.sprites->clone_sprite(sprite->get_gid()));
+	REQUIRE(clone != nullptr);
+	for (bool is_trigger : { false, true }) {
+		CollisionShape2D *target = clone->get_collider(is_trigger);
+		SpxCollisionDebugOverlay *overlay = spx_find_collision_debug_overlay(target);
+		REQUIRE(overlay != nullptr);
+		CHECK(overlay->get_parent() == target);
+		CollisionShape2D *original = sprite->get_collider(is_trigger);
+		const Color original_color = original->get_debug_color();
+		const Color clone_color(0.25, 0.5, 0.75, 0.6);
+		overlay->set_debug_color(clone_color);
+		CHECK(target->get_debug_color() == clone_color);
+		CHECK(original->get_debug_color() == original_color);
+		CHECK_EQ(target->get_child_count(true), 1);
+		CHECK_EQ(target->get_child_count(false), 0);
+		CHECK(overlay->get_internal_mode() == Node::INTERNAL_MODE_FRONT);
+	}
+	clone->play_anim("walk", 1, true, false);
+	const Ref<SpriteFrames> clone_frames = clone->get_anim2d()->get_sprite_frames();
+	CHECK(clone->get_anim2d()->get_animation() == StringName("walk"));
+	CHECK(clone_frames != private_frames);
+	CHECK(clone_frames->has_animation("idle"));
+	CHECK(clone_frames->get_frame_texture("walk", 0) == texture);
+	CHECK_FALSE(private_frames->get_animation_loop("walk"));
+	CHECK(authored->get_animation_loop("idle"));
+}
+
+} // namespace TestSpxSpriteRenderUtil
+
+#endif // TEST_SPX_SPRITE_RENDER_UTIL_H

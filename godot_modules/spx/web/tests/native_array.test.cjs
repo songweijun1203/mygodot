@@ -1,0 +1,701 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const test = require('node:test');
+
+const source = fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.util.js'), 'utf8');
+
+function bridge() {
+    let offset = 64;
+    const freed = [];
+    const module = {};
+    function heap(size) {
+        const buffer = new ArrayBuffer(size);
+        if (module.HEAPU8) new Uint8Array(buffer).set(module.HEAPU8);
+        module.HEAPU8 = new Uint8Array(buffer);
+        module.HEAPU32 = new Uint32Array(buffer);
+        module.HEAPF32 = new Float32Array(buffer);
+    }
+    heap(4 * 1024 * 1024);
+    module._cmalloc = (size) => {
+        const ptr = offset;
+        offset += Math.ceil(size / 8) * 8;
+        if (offset > module.HEAPU8.length) heap(Math.max(offset * 2, module.HEAPU8.length * 2));
+        return ptr;
+    };
+    module._cfree = ptr => freed.push(ptr);
+    module._gdspx_borrow_array = (ptr, bytes, count, type) => {
+        const info = module._cmalloc(12);
+        module.HEAPU32.set([count, type, ptr], info / 4);
+        module.lastBorrow = { ptr, bytes, count, type };
+        return info;
+    };
+    module._gdspx_get_array_info = info => info;
+    const context = vm.createContext({ Module: module, console, TextEncoder, TextDecoder, Uint8Array, DataView });
+    vm.runInContext(source, context);
+    return { context, module, freed, heap, run: text => vm.runInContext(text, context) };
+}
+
+function engineBridge() {
+    const b = bridge();
+    Object.assign(b.context, {
+        autoAddDeps: () => {},
+        mergeInto: Object.assign,
+        LibraryManager: { library: {} },
+    });
+    b.run(fs.readFileSync(path.join(__dirname, '../js/libs/library_godot_gdspx.js'), 'utf8'));
+    // Make the library's runtime helpers available to its callback functions.
+    b.run('Object.assign(GodotGdspx, GodotGdspx.$GodotGdspx)');
+    return { ...b, callbacks: b.context.LibraryManager.library };
+}
+
+test('module replacement uses new exports and releases arenas with their original allocator', () => {
+    const first = bridge();
+    const second = bridge();
+    first.module._gdspx_alloc_bool = () => 16;
+    second.module._gdspx_alloc_bool = () => 24;
+    assert.equal(first.run('AllocGdBool()'), 16);
+    const retired = first.run('GdspxBorrowNativeArray(5, 700000, 700000)');
+    const active = first.run('GdspxBorrowNativeArray(5, 700000, 700000)');
+
+    first.context.Module = second.module;
+    assert.equal(first.run('AllocGdBool()'), 24);
+    const current = first.run('GdspxBorrowNativeArray(5, 8, 8)');
+    assert.equal(current.module, second.module);
+    assert.deepEqual(first.freed, [active.ptr]);
+    first.run('GdspxFlushDeferredFrees()');
+    first.run('GdspxFlushDeferredFrees()');
+    assert.deepEqual(first.freed, [active.ptr, retired.ptr]);
+    assert.deepEqual(second.freed, []);
+    assert.equal(active.data.length, 0);
+    assert.equal(retired.data.length, 0);
+});
+
+test('fixed updates preserve array borrows until the next update begins', () => {
+    const b = engineBridge();
+    const borrows = [];
+    const borrow = () => {
+        const value = b.run('GdspxBorrowNativeArray(5, 8, 8)');
+        value.data.fill(borrows.length + 1);
+        borrows.push(value);
+    };
+    b.context.FFI = {
+        gdspx_dispatch: (event) => {
+            assert.ok(['OnEngineUpdate', 'OnEngineFixedUpdate'].includes(event));
+            borrow();
+        },
+    };
+
+    b.callbacks.godot_js_spx_on_engine_update(1 / 60);
+    for (let i = 0; i < 3; i++) {
+        b.callbacks.godot_js_spx_on_engine_fixed_update(1 / 60);
+    }
+    assert.equal(new Set(borrows.map(value => value.ptr)).size, 4);
+    for (const [i, value] of borrows.entries()) {
+        assert.deepEqual(Array.from(value.data), Array(8).fill(i + 1));
+    }
+    assert.deepEqual(b.freed, []);
+
+    b.callbacks.godot_js_spx_on_engine_update(1 / 60);
+    assert.equal(borrows[4].ptr, borrows[0].ptr, 'Update reuses the arena before calling the handler');
+    assert.deepEqual(Array.from(borrows[4].data), Array(8).fill(5));
+    assert.deepEqual(b.freed, [], 'the active arena stays allocated for reuse');
+});
+
+for (const phase of ['update', 'destroy', 'reset']) {
+    test(`${phase} releases retired arenas once before dispatching the callback`, () => {
+        const b = engineBridge();
+        const borrows = [];
+        b.context.FFI = {
+            gdspx_dispatch: (event) => {
+                assert.equal(event, 'OnEngineFixedUpdate');
+                const value = b.run('GdspxBorrowNativeArray(5, 700000, 700000)');
+                value.data[0] = borrows.length + 1;
+                borrows.push(value);
+            },
+        };
+        for (let i = 0; i < 3; i++) {
+            b.callbacks.godot_js_spx_on_engine_fixed_update(1 / 60);
+        }
+        assert.equal(new Set(borrows.map(value => value.ptr)).size, 3);
+        assert.deepEqual(borrows.map(value => value.data[0]), [1, 2, 3]);
+        assert.deepEqual(b.freed, [], 'FixedUpdate must defer retired arena releases');
+
+        let calls = 0;
+        b.context.FFI.gdspx_dispatch = (event) => {
+            assert.equal(event, `OnEngine${phase[0].toUpperCase()}${phase.slice(1)}`);
+            calls++;
+            assert.deepEqual(b.freed, borrows.slice(0, 2).map(value => value.ptr));
+            const value = b.run('GdspxBorrowNativeArray(5, 8, 8)');
+            assert.equal(value.ptr, borrows[2].ptr, 'the active arena is reset before dispatch');
+        };
+        b.callbacks[`godot_js_spx_on_engine_${phase}`](1 / 60);
+        b.callbacks[`godot_js_spx_on_engine_${phase}`](1 / 60);
+        assert.equal(calls, 2);
+        assert.equal(new Set(b.freed).size, b.freed.length, 'no arena is freed twice');
+    });
+}
+
+test('Web callback signatures match their C value types', () => {
+    const b = engineBridge();
+    const header = fs.readFileSync(path.join(__dirname, '../godot_js_spx.h'), 'utf8');
+    const types = {GdObj: 'j', GdInt: 'j', GdString: 'i', GdFloat: 'f', GdBool: 'i'};
+    for (const [, name, params] of header.matchAll(/extern void (godot_js_spx_on_\w+)\(([^)]*)\);/g)) {
+        const signature = 'v' + (params ? params.split(',').map(param => {
+            const type = param.trim().split(/\s+/)[0];
+            assert.ok(types[type], `unexpected callback type: ${param}`);
+            return types[type];
+        }).join('') : '');
+        assert.equal(b.callbacks[name + '__sig'], signature, name);
+    }
+});
+
+test('integer and object callbacks preserve all 64 bits through dispatch', () => {
+    const b = engineBridge();
+    const calls = [];
+    b.context.FFI = {gdspx_dispatch: (...args) => calls.push(args)};
+    for (const [value, low, high] of [
+        [0n, 0, 0],
+        [0x20000000000001n, 1, 0x200000],
+        [0x7fffffffffffffffn, 0xffffffff, 0x7fffffff],
+        [-0x8000000000000000n, 0, 0x80000000],
+        [-1n, 0xffffffff, 0xffffffff],
+    ]) {
+        for (const [callback, event] of [
+            ['mouse_pressed', 'OnMousePressed'], ['mouse_released', 'OnMouseReleased'],
+            ['key_pressed', 'OnKeyPressed'], ['key_released', 'OnKeyReleased'],
+            ['sprite_ready', 'OnSpriteReady'], ['sprite_destroyed', 'OnSpriteDestroyed'],
+            ['sprite_frames_set_changed', 'OnSpriteFramesSetChanged'],
+            ['sprite_animation_changed', 'OnSpriteAnimationChanged'],
+            ['sprite_frame_changed', 'OnSpriteFrameChanged'],
+            ['sprite_animation_looped', 'OnSpriteAnimationLooped'],
+            ['sprite_animation_finished', 'OnSpriteAnimationFinished'],
+            ['sprite_vfx_finished', 'OnSpriteVfxFinished'],
+            ['sprite_screen_exited', 'OnSpriteScreenExited'], ['sprite_screen_entered', 'OnSpriteScreenEntered'],
+            ['ui_ready', 'OnUiReady'], ['ui_updated', 'OnUiUpdated'], ['ui_destroyed', 'OnUiDestroyed'],
+            ['ui_pressed', 'OnUiPressed'], ['ui_released', 'OnUiReleased'],
+            ['ui_hovered', 'OnUiHovered'], ['ui_clicked', 'OnUiClicked'],
+        ]) {
+            b.callbacks['godot_js_spx_on_' + callback](value);
+            const [name, arg] = calls.pop();
+            assert.equal(name, event);
+            assert.deepEqual({...arg}, {low, high});
+        }
+    }
+});
+
+test('mixed callbacks preserve scalar and string arguments', () => {
+    const b = engineBridge();
+    const calls = [];
+    b.context.FFI = {gdspx_dispatch: (...args) => calls.push(args)};
+    b.context.GodotRuntime = {parseString: ptr => ({8: '精灵', 16: 'hello'})[ptr]};
+    b.callbacks.godot_js_spx_on_scene_sprite_instantiated(-1n, 8);
+    b.callbacks.godot_js_spx_on_ui_text_changed(-1n, 16);
+    b.callbacks.godot_js_spx_on_ui_toggle(-1n, 1);
+    assert.deepEqual(calls.map(([name, obj, value]) => [name, {...obj}, value]), [
+        ['OnSceneSpriteInstantiated', {low: 0xffffffff, high: 0xffffffff}, '精灵'],
+        ['OnUiTextChanged', {low: 0xffffffff, high: 0xffffffff}, 'hello'],
+        ['OnUiToggle', {low: 0xffffffff, high: 0xffffffff}, 1],
+    ]);
+});
+
+test('runtime notifications keep dedicated exports and numeric exit codes', () => {
+    const b = engineBridge();
+    const calls = [];
+    b.context.GodotRuntime = {parseString: () => 'runtime failed'};
+    b.context.FFI = {
+        gdspx_on_runtime_exit: code => calls.push(['exit', code]),
+        gdspx_on_runtime_reset: code => calls.push(['reset', code]),
+        gdspx_on_runtime_panic: message => calls.push(['panic', message]),
+    };
+    for (const code of [0n, 7n, -1n]) {
+        b.callbacks.godot_js_spx_on_runtime_exit(code);
+        b.callbacks.godot_js_spx_on_reset_done(code);
+    }
+    b.callbacks.godot_js_spx_on_runtime_panic(8);
+    assert.deepEqual(calls, [
+        ['exit', 0], ['reset', 0], ['exit', 7], ['reset', 7],
+        ['exit', -1], ['reset', -1], ['panic', 'runtime failed'],
+    ]);
+});
+
+test('reset and destroy advance action IDs after teardown callbacks', () => {
+    const b = engineBridge();
+    b.run(fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.input.js'), 'utf8'));
+    const calls = [];
+    const epoch = b.context.GdspxGetInputActionEpoch();
+    b.context.FFI = {
+        gdspx_on_runtime_reset: () => calls.push(['runtime', b.context.GdspxGetInputActionEpoch()]),
+        gdspx_dispatch: event => calls.push([event, b.context.GdspxGetInputActionEpoch()]),
+    };
+    b.callbacks.godot_js_spx_on_engine_reset();
+    b.callbacks.godot_js_spx_on_reset_done(0n);
+    b.callbacks.godot_js_spx_on_engine_destroy();
+    b.callbacks.godot_js_spx_on_engine_destroyed();
+    assert.deepEqual(calls, [
+        ['OnEngineReset', epoch], ['runtime', epoch + 1],
+        ['OnEngineDestroy', epoch + 1], ['OnEngineDestroyed', epoch + 2],
+    ]);
+});
+
+for (const batched of [true, false]) {
+    test(`contacts preserve signed IDs and order before frame dispatch (batched=${batched})`, () => {
+        const b = engineBridge();
+        const calls = [];
+        const records = [];
+        const events = ['CollisionEnter', 'CollisionStay', 'CollisionExit', 'TriggerEnter', 'TriggerStay', 'TriggerExit'];
+        const self = -0x8000000000000000n;
+        const other = 0x2000007fc00001n;
+        b.context.FFI = {gdspx_dispatch: (...args) => calls.push(args)};
+        if (batched) {
+            b.context.gdspx_on_contact_events = bytes => {
+                assert.ok(bytes instanceof Uint8Array);
+                assert.equal(bytes.length, events.length * 20);
+                const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+                for (let offset = 0; offset < bytes.length; offset += 20) {
+                    records.push([view.getUint32(offset, true), view.getBigInt64(offset + 4, true), view.getBigInt64(offset + 12, true)]);
+                }
+                calls.push(['batch']);
+            };
+        }
+        for (const frame of ['fixed_update', 'update']) {
+            calls.length = 0;
+            records.length = 0;
+            for (const event of events) {
+                const callback = event.replace(/[A-Z]/g, value => '_' + value.toLowerCase());
+                b.callbacks['godot_js_spx_on' + callback](self, other);
+            }
+            assert.equal(calls.length, 0, 'contacts wait for the next frame');
+            b.callbacks['godot_js_spx_on_engine_' + frame](0.25);
+            const frameEvent = frame === 'update' ? 'OnEngineUpdate' : 'OnEngineFixedUpdate';
+            if (batched) {
+                assert.deepEqual(records, events.map((_, index) => [index + 1, self, other]));
+                assert.deepEqual(calls, [['batch'], [frameEvent, 0.25]]);
+            } else {
+                assert.deepEqual(calls.slice(0, -1).map(([name, a, b]) => [name, {...a}, {...b}]), events.map(event => [
+                    'On' + event, {low: 0, high: 0x80000000}, {low: 0x7fc00001, high: 0x200000},
+                ]));
+                assert.deepEqual(calls.at(-1), [frameEvent, 0.25]);
+            }
+            calls.length = 0;
+            b.callbacks['godot_js_spx_on_engine_' + frame](0.5);
+            assert.deepEqual(calls, [[frameEvent, 0.5]], 'flushed contacts must not repeat');
+        }
+    });
+}
+
+test('all fixed-width types use the same native descriptor and borrow their input', () => {
+    const b = bridge();
+    for (const [type, size] of [[1, 8], [2, 4], [3, 1], [5, 1], [6, 8]]) {
+        b.context.type = type;
+        b.context.size = size;
+        b.run('array = GdspxBorrowNativeArray(type, 2, size * 2); array.data[0] = 1; wrapper = ToGdArray(array);');
+        assert.equal(b.module.lastBorrow.ptr, b.context.array.ptr);
+        assert.equal(b.module.lastBorrow.count, 2);
+        assert.equal(b.module.lastBorrow.type, type);
+        assert.equal(b.module.lastBorrow.bytes, size * 2);
+        const result = b.run('ToJsArray(wrapper)');
+        assert.equal(result.type, type);
+        assert.equal(result.count, 2);
+        b.module.HEAPU8[b.context.array.ptr] = 0;
+        assert.equal(result.data[0], 1, 'returned payload must survive native release/reuse');
+    }
+});
+
+test('string inputs use offset/length data and string results use the same layout', () => {
+    const b = bridge();
+    const input = b.run('GdspxBorrowNativeArray(4, 2, 20)');
+    input.data.set([16, 0, 0, 0, 2, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 104, 105, 0, 0]);
+    b.context.array = input;
+    b.run('ToGdArray(array)');
+    assert.equal(b.module.lastBorrow.ptr, input.ptr);
+    assert.equal(b.module.lastBorrow.type, 4);
+    const strings = b.module._cmalloc(8);
+    b.module.HEAPU32.set([input.ptr + 16, input.ptr + 19], strings / 4);
+    const info = b.module._cmalloc(12);
+    b.module.HEAPU32.set([2, 4, strings], info / 4);
+    b.context.info = info;
+    const output = b.run('ToJsArray(info)');
+    assert.deepEqual(Array.from(output.data), Array.from(input.data));
+    input.data.fill(0);
+    assert.equal(output.data[16], 104);
+});
+
+test('arenas rotate without overwriting earlier arguments and refresh after memory growth', () => {
+    const b = bridge();
+    const first = b.run('GdspxBorrowNativeArray(5, 700000, 700000)');
+    first.data[0] = 23;
+    const second = b.run('GdspxBorrowNativeArray(5, 700000, 700000)');
+    second.data[0] = 42;
+    assert.notEqual(first.ptr, second.ptr);
+    assert.equal(first.data[0], 23);
+    assert.equal(b.freed.length, 0);
+    const oldBuffer = first.data.buffer;
+    b.heap(8 * 1024 * 1024);
+    assert.notEqual(first.data.buffer, oldBuffer);
+    assert.equal(first.data[0], 23);
+    b.run('GdspxFlushDeferredFrees()');
+    assert.equal(b.freed.length, 1);
+});
+
+test('empty arrays preserve their type and malformed descriptors are rejected', () => {
+    const b = bridge();
+    for (const type of [1, 2, 3, 4, 5, 6]) {
+        b.context.type = type;
+        const out = b.run('ToJsArray(ToGdArray(GdspxBorrowNativeArray(type, 0, 0)))');
+        assert.equal(out.type, type);
+        assert.equal(out.count, 0);
+        assert.equal(out.data.length, 0);
+    }
+    assert.equal(b.run('GdspxBorrowNativeArray(4, 2, 16)'), null);
+    assert.equal(b.run('GdspxBorrowNativeArray(99, 0, 0)'), null);
+    assert.throws(() => b.run('ToGdArray(new Uint8Array(8))'), /requires a native array/);
+    assert.equal(b.run('ToJsArray(0)'), null);
+    const slots = b.module._cmalloc(4);
+    const info = b.module._cmalloc(12);
+    b.module.HEAPU32.set([1, 4, slots], info / 4);
+    b.context.info = info;
+    assert.equal(b.run('ToJsArray(info)'), null, 'invalid native results preserve the null result');
+});
+
+test('generated wrappers release every acquired argument and result on failure', () => {
+    const generated = fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.js'), 'utf8');
+    for (const failure of ['argument', 'call', 'result', null]) {
+        const b = bridge();
+        const allocated = [];
+        const released = [];
+        const allocate = () => {
+            const ptr = b.module._cmalloc(8);
+            allocated.push(ptr);
+            return ptr;
+        };
+        let arrays = 0;
+        Object.assign(b.context, {
+            AllocGdString: allocate,
+            ToGdString: allocate,
+            ToGdArray: () => {
+                if (++arrays === 2 && failure === 'argument') throw new Error('argument');
+                return allocate();
+            },
+            ToJsString: () => {
+                if (failure === 'result') throw new Error('result');
+                return 'ok';
+            },
+            FreeGdArray: ptr => released.push(ptr),
+            FreeGdString: ptr => released.push(ptr),
+        });
+        b.module._gdspx_res_apply_project_fonts = () => {
+            if (failure === 'call') throw new Error('call');
+        };
+        b.run(generated);
+        const call = () => b.run('new GdspxFuncs().gdspx_res_apply_project_fonts("", [], [], [])');
+        if (failure) assert.throws(call, new RegExp(failure));
+        else assert.equal(call(), 'ok');
+        assert.deepEqual(released.sort((a, b) => a - b), allocated.sort((a, b) => a - b));
+    }
+});
+
+test('position batches pass independent native input and output counts without array wrappers', () => {
+    const b = bridge();
+    b.module._gdspx_alloc_bool = () => b.module._cmalloc(1);
+    b.module._gdspx_free_bool = b.module._cfree;
+    let success = true;
+    b.module._gdspx_sprite_batch_retrieve_positions = (inputPtr, inputCount, outPtr, outLen, resultPtr) => {
+        assert.equal(inputCount, 2);
+        assert.equal(outLen, 4);
+        assert.notEqual(inputPtr, outPtr);
+        assert.equal(b.module.HEAPU32[inputPtr / 4], 0x7fc00001);
+        assert.equal(b.module.HEAPU32[inputPtr / 4 + 1], 0x11223344);
+        if (success) b.module.HEAPF32.set([3, -4, NaN, NaN], outPtr / 4);
+        b.module.HEAPU8[resultPtr] = success ? 1 : 0;
+    };
+    b.run(fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.js'), 'utf8'));
+    const objs = b.run('objs = GdspxBorrowNativeArray(6, 2, 16)');
+    const out = b.run('out = GdspxBorrowNativeArray(2, 4, 16)');
+    const ids = [0x7fc00001, 0x11223344, 999, 0];
+    b.module.HEAPU32.set(ids, objs.ptr / 4);
+    b.module.HEAPF32.fill(42, out.ptr / 4, out.ptr / 4 + 4);
+    // No _gdspx_alloc_array/_gdspx_free_array exports are installed in this test.
+    assert.equal(b.run('new GdspxFuncs().gdspx_sprite_batch_retrieve_positions(objs, out)'), true);
+    success = false;
+    assert.equal(b.run('new GdspxFuncs().gdspx_sprite_batch_retrieve_positions(objs, out)'), false);
+    assert.deepEqual(Array.from(b.module.HEAPU32.subarray(objs.ptr / 4, objs.ptr / 4 + 4)), ids);
+    assert.deepEqual(Array.from(b.module.HEAPF32.subarray(out.ptr / 4, out.ptr / 4 + 4)), [3, -4, NaN, NaN]);
+});
+
+test('fixed output allocation uses generated metadata and preserves in-place calls', () => {
+    const b = bridge();
+    b.run(fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.js'), 'utf8'));
+    const calls = [];
+    b.module._gdspx_input_write_snapshot = (...args) => {
+        assert.equal(args.length, 1);
+        const [ptr] = args;
+        calls.push(ptr);
+        b.module.HEAPF32.set([1.5, -2.5, 7], ptr / 4);
+    };
+    const snapshot = b.run("GdspxFuncs['arrayOutputs']['gdspx_input_write_snapshot']()");
+    assert.equal(snapshot.type, 2);
+    assert.equal(snapshot.count, 3);
+    assert.equal(snapshot.data.length, 12);
+    assert.deepEqual(Array.from(b.module.HEAPF32.subarray(snapshot.ptr / 4, snapshot.ptr / 4 + 3)), [1.5, -2.5, 7]);
+    for (const count of [0, 2, 3, 4]) {
+        b.context.count = count;
+        const out = b.run('out = GdspxBorrowNativeArray(2, count, count * 4)');
+        b.module.HEAPF32.fill(42, out.ptr / 4, out.ptr / 4 + count);
+        const callCount = calls.length;
+        const invoke = () => b.run('new GdspxFuncs().gdspx_input_write_snapshot(out)');
+        if (count !== 3) {
+            assert.throws(invoke, /output array length must match/);
+            assert.equal(calls.length, callCount);
+        } else {
+            invoke();
+            assert.equal(calls.at(-1), out.ptr);
+        }
+        const values = Array.from(b.module.HEAPF32.subarray(out.ptr / 4, out.ptr / 4 + count));
+        assert.deepEqual(values, count !== 3 ? Array(count).fill(42) : [1.5, -2.5, 7]);
+    }
+    // A different type and count exercise the same allocator without a method-name branch.
+    b.module._example = ptr => b.module.HEAPU8.fill(23, ptr, ptr + 7);
+    const bytes = b.run("ReadArrayOutput('_example', 5, 7)");
+    assert.equal(bytes.type, 5);
+    assert.equal(bytes.count, 7);
+    assert.deepEqual(Array.from(bytes.data), Array(7).fill(23));
+    assert.equal(b.run("ReadArrayOutput('_missing', 5, 7)"), null);
+    delete b.module._gdspx_input_write_snapshot;
+    assert.equal(b.run("GdspxFuncs['arrayOutputs']['gdspx_input_write_snapshot']()"), null);
+});
+
+test('structured results are fresh by default and reuse only an explicit destination', () => {
+    const b = bridge();
+    const ptr = b.module._cmalloc(16);
+    b.context.ptr = ptr;
+    b.module.HEAPF32.set([1, 2, 3, 4], ptr / 4);
+    for (const [type, expected] of [
+        ['Vec2', {x: 1, y: 2}],
+        ['Vec3', {x: 1, y: 2, z: 3}],
+        ['Vec4', {x: 1, y: 2, z: 3, w: 4}],
+        ['Color', {r: 1, g: 2, b: 3, a: 4}],
+        ['Rect2', {position: {x: 1, y: 2}, size: {x: 3, y: 4}}],
+    ]) {
+        const first = b.run(`ToJs${type}(ptr)`);
+        assert.deepEqual(JSON.parse(JSON.stringify(first)), expected);
+        assert.notEqual(b.run(`ToJs${type}(ptr)`), first);
+        b.context.first = first;
+        assert.equal(b.run(`ToJs${type}(ptr, first)`), first);
+        if (type === 'Rect2') {
+            const position = first.position;
+            b.run('ToJsRect2(ptr, first)');
+            assert.equal(first.position, position);
+        }
+    }
+});
+
+test('integer and object results preserve bits, reuse scope and heap growth', () => {
+    const b = bridge();
+    const ptr = b.module._cmalloc(8);
+    b.context.ptr = ptr;
+    b.module.HEAPU32.set([0x89abcdef, 0xfedcba98], ptr / 4);
+    const first = b.run('ToJsInt(ptr)');
+    assert.deepEqual({...first}, {low: 0x89abcdef, high: 0xfedcba98});
+    assert.notEqual(b.run('ToJsInt(ptr)'), first);
+    b.context.result = first;
+    assert.equal(b.run('ToJsObj(ptr, result)'), first);
+    b.heap(8 * 1024 * 1024);
+    b.module.HEAPU32.set([0xffffffff, 0x80000000], ptr / 4);
+    assert.equal(b.run('ToJsInt(ptr, result)'), first);
+    assert.deepEqual({...first}, {low: 0xffffffff, high: 0x80000000});
+
+    b.run(fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.js'), 'utf8'));
+    const released = [];
+    Object.assign(b.context, {
+        AllocGdInt: () => ptr,
+        FreeGdInt: value => released.push(value),
+        AllocGdObj: () => ptr,
+        FreeGdObj: value => released.push(value),
+    });
+    b.run('api = new GdspxFuncs(); other = new GdspxFuncs()');
+    const names = ['gdspx_platform_get_max_fps', 'gdspx_audio_create_audio'];
+    const results = [];
+    for (const name of names) {
+        b.module['_' + name] = () => {};
+        b.context.name = name;
+        const value = b.run('api[name]()');
+        results.push(value);
+        assert.deepEqual({...value}, {low: 0xffffffff, high: 0x80000000});
+        assert.equal(b.run('api[name]()'), value);
+        assert.notEqual(b.run('other[name]()'), value);
+    }
+    assert.notEqual(results[0], results[1], 'int and object results use separate slots');
+    assert.equal(released.length, names.length * 3);
+});
+
+test('structured results remain independent and release storage on failure', () => {
+    const b = bridge();
+    b.run(fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.js'), 'utf8'));
+    const released = [];
+    Object.assign(b.context, {
+        AllocGdVec2: () => b.module._cmalloc(8),
+        FreeGdVec2: ptr => released.push(ptr),
+    });
+    let value = 0;
+    b.module._gdspx_input_get_global_mouse_pos = ptr => b.module.HEAPF32.set([++value, 2], ptr / 4);
+    b.module._gdspx_camera_get_camera_position = b.module._gdspx_input_get_global_mouse_pos;
+    b.run('api = new GdspxFuncs(); other = new GdspxFuncs()');
+    const first = b.run('api.gdspx_input_get_global_mouse_pos()');
+    const second = b.run('api.gdspx_input_get_global_mouse_pos()');
+    assert.notEqual(first, second);
+    assert.equal(first.x, 1);
+    assert.equal(second.x, 2);
+    assert.notEqual(b.run('other.gdspx_input_get_global_mouse_pos()'), first);
+    assert.notEqual(b.run('api.gdspx_camera_get_camera_position()'), b.run('api.gdspx_camera_get_camera_position()'));
+    assert.equal(released.length, 5);
+    b.module._gdspx_input_get_global_mouse_pos = () => { throw new Error('engine failure'); };
+    assert.throws(() => b.run('api.gdspx_input_get_global_mouse_pos()'), /engine failure/);
+    assert.equal(released.length, 6);
+    assert.equal(b.run('api.gdspx_res_free_str'), undefined);
+    assert.equal(b.run('api.gdspx_global_free_string'), undefined);
+});
+
+test('writable arrays retain caller storage and reject copied or stale buffers', () => {
+    const b = bridge();
+    b.run('input = {[GDSPX_ARRAY_TAG]: true, type: 2, count: 1, data: new Uint8Array([0, 0, 192, 63])}');
+    const copied = b.run('RequireNativeArray(input, "read", 2)');
+    assert.equal(b.module.HEAPF32[copied / 4], 1.5);
+    assert.throws(() => b.run('RequireNativeArray(input, "write", 2, true)'), /pre-allocated Wasm array/);
+    const borrowed = b.run('borrowed = GdspxBorrowNativeArray(2, 1, 4)');
+    const ptr = b.run('RequireNativeArray(borrowed, "write", 2, true)');
+    assert.equal(ptr, borrowed.ptr);
+    b.module.HEAPF32[ptr / 4] = 2.5;
+    assert.equal(new DataView(borrowed.data.buffer, borrowed.data.byteOffset, 4).getFloat32(0, true), 2.5);
+    b.run('clone = {...borrowed}');
+    assert.throws(() => b.run('RequireNativeArray(clone, "write", 2, true)'), /pre-allocated Wasm array/);
+    const copiedPtr = b.run('RequireNativeArray(clone, "read", 2)');
+    assert.notEqual(copiedPtr, ptr, 'copied descriptors cannot claim the original Wasm pointer');
+    assert.equal(b.module.HEAPF32[copiedPtr / 4], 2.5);
+    assert.throws(() => b.run('RequireNativeArray(borrowed, "write", 5, true)'), /incompatible/);
+    b.context.Module = {...b.module};
+    assert.throws(() => b.run('RequireNativeArray(borrowed, "read", 2)'), /valid native array/);
+    assert.throws(() => b.run('RequireNativeArray(borrowed, "write", 2, true)'), /valid native array/);
+});
+
+test('expired arena descriptors cannot lend reused or freed storage', () => {
+    const b = bridge();
+    b.run('var retired = GdspxBorrowNativeArray(5, 700000, 700000); var active = GdspxBorrowNativeArray(5, 700000, 700000)');
+    const retired = b.run('retired');
+    const active = b.run('active');
+    b.run('GdspxFlushDeferredFrees()');
+    assert.ok(b.freed.includes(retired.ptr));
+    assert.equal(retired.data.length, 0);
+    assert.equal(active.data.length, 0);
+    for (const name of ['retired', 'active']) {
+        for (const writable of [false, true]) {
+            assert.throws(() => b.run(`RequireNativeArrayBuffer(${name}, 'test', 5, ${writable})`), /valid native array/);
+        }
+        assert.equal(b.run(`NativeArrayCount(${name})`), -1);
+    }
+    const fresh = b.run('var fresh = GdspxBorrowNativeArray(5, 8, 8); fresh');
+    assert.equal(fresh.ptr, active.ptr);
+    assert.equal(fresh.data.length, 8);
+    assert.equal(b.run("RequireNativeArrayBuffer(fresh, 'test', 5, true).ptr"), fresh.ptr);
+    assert.equal(active.data.length, 0, 'reuse must not revive a descriptor');
+});
+
+for (const phase of ['reset', 'destroy']) for (const batched of [false, true]) {
+    test(`${phase} (batched=${batched}) drops queued and teardown contacts until a new session starts`, () => {
+        const b = engineBridge();
+        const calls = [];
+        b.context.FFI = { gdspx_dispatch: event => {
+            calls.push(event);
+            if (event === `OnEngine${phase[0].toUpperCase()}${phase.slice(1)}`) {
+                b.callbacks.godot_js_spx_on_trigger_exit(10n, 11n);
+            }
+        }};
+        if (batched) b.context.gdspx_on_contact_events = bytes => {
+            const kinds = ['OnCollisionEnter', 'OnCollisionStay', 'OnCollisionExit', 'OnTriggerEnter', 'OnTriggerStay', 'OnTriggerExit'];
+            const values = new Uint32Array(bytes.buffer);
+            for (let i = 0; i < values.length; i += 5) calls.push(kinds[values[i] - 1]);
+        };
+        b.callbacks.godot_js_spx_on_trigger_enter(10n, 11n);
+        b.callbacks[`godot_js_spx_on_engine_${phase}`]();
+        b.callbacks.godot_js_spx_on_trigger_exit(10n, 11n);
+        b.callbacks.godot_js_spx_on_engine_update(1 / 60);
+        assert.deepEqual(calls, [`OnEngine${phase[0].toUpperCase()}${phase.slice(1)}`, 'OnEngineUpdate']);
+        b.callbacks.godot_js_spx_contact_session_start();
+        b.callbacks.godot_js_spx_on_trigger_enter(20n, 21n);
+        b.callbacks.godot_js_spx_on_engine_fixed_update(1 / 60);
+        assert.deepEqual(calls.slice(-2), ['OnTriggerEnter', 'OnEngineFixedUpdate']);
+    });
+}
+
+test('reset during fallback contact dispatch stops the previous batch', () => {
+    const b = engineBridge();
+    const calls = [];
+    b.context.FFI = { gdspx_dispatch: event => {
+        calls.push(event);
+        if (event === 'OnTriggerEnter') b.callbacks.godot_js_spx_on_engine_reset();
+    }};
+    b.callbacks.godot_js_spx_on_trigger_enter(1n, 2n);
+    b.callbacks.godot_js_spx_on_trigger_enter(3n, 4n);
+    b.callbacks.godot_js_spx_on_engine_fixed_update(1 / 60);
+    assert.deepEqual(calls, ['OnTriggerEnter', 'OnEngineReset', 'OnEngineFixedUpdate']);
+});
+
+test('generated scalar inputs bypass pools even when the manager fails', () => {
+    const b = bridge();
+    const calls = [];
+    Object.assign(b.module, {
+        _gdspx_physics_set_global_gravity: value => calls.push(['float', value]),
+        _gdspx_camera_set_camera_smoothing: value => calls.push(['bool', value]),
+        _gdspx_sprite_set_rotation: (id, rotation) => {
+            calls.push(['rotation', id, rotation]);
+            throw new Error('manager failed');
+        },
+    });
+    b.run(fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.js'), 'utf8'));
+    const api = b.run('new GdspxFuncs()');
+    api.gdspx_physics_set_global_gravity(9.81);
+    api.gdspx_camera_set_camera_smoothing(true);
+    api.gdspx_camera_set_camera_smoothing(false);
+    assert.throws(() => api.gdspx_sprite_set_rotation(1, 0x200000, 45.5), /manager failed/);
+    assert.deepEqual(calls, [
+        ['float', 9.81], ['bool', 1], ['bool', 0],
+        ['rotation', 9007199254740993n, 45.5],
+    ]);
+    assert.deepEqual(b.freed, []);
+});
+
+test('generated int64 inputs preserve signed precision and order for integers and multiple IDs', () => {
+    const b = bridge();
+    const calls = [];
+    const released = [];
+    Object.assign(b.module, {
+        _gdspx_camera_set_camera_limit: (side, limit) => calls.push([side, limit]),
+        _gdspx_sprite_set_z_index: (id, index) => calls.push([id, index]),
+        _gdspx_sprite_check_collision: (id, target, sourceTrigger, targetTrigger, result) => {
+            calls.push([id, target]);
+            assert.equal(sourceTrigger, 1);
+            assert.equal(targetTrigger, 0);
+            assert.equal(result, 64);
+            b.module.HEAPU8[result] = 1;
+        },
+        _gdspx_alloc_bool: () => 64,
+        _gdspx_free_bool: ptr => released.push(ptr),
+    });
+    b.run(fs.readFileSync(path.join(__dirname, '../js/engine/gdspx.js'), 'utf8'));
+    const api = b.run('new GdspxFuncs()');
+    const values = [0n, 1n, -1n, 0xffffffffn, 0x100000000n,
+        9007199254740991n, 9007199254740992n, 9007199254740993n,
+        -9007199254740993n, 9223372036854775807n, -9223372036854775808n];
+    const parts = value => [Number(BigInt.asUintN(32, value)), Number(BigInt.asUintN(32, value >> 32n))];
+    for (const [index, first] of values.entries()) {
+        const second = values[(index + 1) % values.length];
+        const args = [...parts(first), ...parts(second)];
+        api.gdspx_camera_set_camera_limit(...args);
+        api.gdspx_sprite_set_z_index(...args);
+        assert.equal(api.gdspx_sprite_check_collision(...args, true, false), true);
+        assert.deepEqual(calls.splice(0), [[first, second], [first, second], [first, second]]);
+    }
+    assert.deepEqual(released, values.map(() => 64), 'return values retain their existing output pool');
+    assert.deepEqual(b.freed, []);
+});

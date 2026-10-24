@@ -2,4 +2,3 @@
 src/*.os
 project/bin/*
 project/.godot/
-godot-cpp/

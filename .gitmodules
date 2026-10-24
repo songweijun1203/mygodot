@@ -1,0 +1,9 @@
+
+[submodule "gdexample/godot-cpp"]
+	path = gdexample/godot-cpp
+	url = https://github.com/godotengine/godot-cpp.git
+	branch = 4.4
+[submodule "godot"]
+	path = godot
+	url = https://github.com/goplus/godot.git
+	branch = spx4.4.1

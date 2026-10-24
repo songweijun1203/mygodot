@@ -1,0 +1,70 @@
+/**************************************************************************/
+/*  spx.h                                                                 */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#ifndef SPX_H
+#define SPX_H
+#include "core/templates/safe_refcount.h"
+#include "spx_pending_controls.h"
+
+class MainLoop;
+
+class Spx {
+	friend class SpxEngine;
+
+	static inline bool extension_functions_registered = false;
+	static inline SafeFlag initialized{ false };
+	static inline bool debug_mode = false;
+	static inline SpxPendingControls pending_controls;
+
+public:
+	static void register_extension_functions();
+	static void unregister_extension_functions();
+	static void register_main_loop_callbacks();
+	static void unregister_main_loop_callbacks();
+	static bool is_initialized() { return initialized.is_set(); }
+	static bool is_debug_mode() { return debug_mode; }
+	static void set_debug_mode(bool enable);
+
+	static void register_types();
+	static void on_start(MainLoop *p_main_loop);
+	static void on_fixed_update(double delta);
+	static void on_update(double delta);
+	static void on_destroy();
+
+	static void reset(int exit_code);
+	static void restart();
+
+	static void pause();
+	static void resume();
+	static bool is_paused();
+	static void next_frame();
+};
+
+#endif // SPX_H

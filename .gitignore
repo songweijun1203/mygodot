@@ -1,6 +1,14 @@
-godot_modules/
-godot/
 .DS_Store
 .spx-build/
 .godot/
-.vscode/*.local.json
+build/
+godot_modules/**/*.o
+godot_modules/**/*.os
+godot_modules/**/*.a
+godot_modules/**/*.dylib
+godot_modules/**/*.so
+godot_modules/**/*.dll
+godot_modules/**/*.wasm
+godot_modules/**/.sconsign.dblite
+godot_modules/**/__pycache__/
+godot_modules/**/*.py[cod]
