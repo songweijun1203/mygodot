@@ -9,17 +9,20 @@ public:
     Sprite(const std::string& n);
     ~Sprite();
 public:
-    bool CreateGdSprite(const std::string& path,const XVec2& pos) override;
+    //bool CreateGdSprite(const std::string& path,const XVec2& pos) override;
 
+    sptr<IGdSprite> GetOrCreateGdSprite(const SpriteType& type) override;
     sptr<IGdSprite> GetGdSprite() override;
 
-    bool CreateGdBareSprite(const XVec2& pos) override;
+    sptr<IGdAudio> GetOrCreateAudio() override;
 
-    bool CreateGdBackdrop() override;
+    //bool CreateGdBareSprite(const XVec2& pos) override;
 
-    sptr<IBubbleBase> GetTextBubble() override;
+    //bool CreateGdBackdrop() override;
 
-    sptr<IBubbleBase> GetQuoteBubble() override;
+    sptr<IBubbleBase> GetOrCreateTextBubble() override;
+
+    sptr<IBubbleBase> GetOrCreateQuoteBubble() override;
 
 protected:
     class Internal;

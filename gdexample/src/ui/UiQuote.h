@@ -25,6 +25,7 @@ public:
     bool CreateGdNode(const std::string& ui_path) override;
     void BindVariantNodes() override;
     sptr<IGdUiNode> GetUiNode() const override;
+    void SetScale(const XVec2& s) override;
     sptr<IGdUiNode> GetChildUiNode(UiQuoteNodeType type) const;
 private:
     class Internal;

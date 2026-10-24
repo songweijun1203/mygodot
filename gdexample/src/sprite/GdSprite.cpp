@@ -25,6 +25,24 @@ void GdSprite::SetId(Object_t t)
     id = t;
 }
 
+void GdSprite::CreateSprite(const SpriteType& type)
+{
+    auto sprite_mgr_base = DataManger::getInstance().getSpriteMgr();
+    auto sprite_mgr = sprite_mgr_base->asDerived<SpriteMgr>();
+    switch (type)
+    {
+    case SpriteType::sprite:
+        SetId(sprite_mgr->CreateSprite("",XVec2{0,0}));
+        break;
+    case SpriteType::backdrop:
+        SetId(sprite_mgr->CreateBackdrop(""));
+        break;
+    default:
+        break;
+    }
+    //sprite_mgr->CreateSprite("",XVec2{0,0});
+}
+
 void GdSprite::SetTexture(const std::string &path)
 {
     if (id == 0 || path.empty())

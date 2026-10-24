@@ -9,8 +9,10 @@
 #include "ui/UiAsk.h"
 #include "ui/UiSay.h"
 #include "ui/UiQuote.h"
+#include "other/GdAudio.h"
 #include "camera/Camera.h"
 #include "spx_api.h"
+#include "other/GdPen.h"
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -45,12 +47,13 @@ public:
     godot::Node *root;
     std::vector<sptr<ISprite>> sprites;
     sptr<Camera> camera;
-    sptr<IMonitor> monitor;
-    sptr<IUiAsk> uiask;
+    sptr<IUiComponent> monitor;
+    sptr<IUiComponent> uiask;
     sptr<IUiComponent> uiSay;
     sptr<IUiComponent> uiQuote;
     int64_t viewport_width;
     int64_t viewport_height;
+    sptr<GdAudio> audio;
 
     bool move_left = false;
     bool move_right = false;
@@ -118,16 +121,17 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
     // uiask节点创建
     {
         mData->uiask = makeShareObject<UiAsk>();
+        auto uiask = mData->uiask->asDerived<UiAsk>();
         if (mData->uiask->CreateGdNode("res://engine/ui/UiAsk.tscn"))
         {
             mData->uiask->GetUiNode()->SetVisible(false);
             mData->uiask->BindVariantNodes();
-            auto ask_body = mData->uiask->GetChildUiNode(UiAskNodeType::askBody);
+            auto ask_body = uiask->GetChildUiNode(UiAskNodeType::askBody);
             if (ask_body)
             {
                 ask_body->SetVisible(true);
             }
-            auto label_ask = mData->uiask->GetChildUiNode(UiAskNodeType::askLabel);
+            auto label_ask = uiask->GetChildUiNode(UiAskNodeType::askLabel);
             label_ask->SetText("2134429530859045646456456456456666666666346734567375543457457347435734575437337354680456");
         }
     }
@@ -181,37 +185,40 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         spx.physics_set_collision_system_type(false);
     }
 
+    sptr<ISprite> player;
     // 设置游戏精灵
     {
-        auto player = makeShareObject<Sprite>("player");
-        player->CreateGdSprite("", XVec2{0, 0});
+        player = makeShareObject<Sprite>("player");
+        auto gdplayer= player->GetOrCreateGdSprite(SpriteType::sprite);
+        gdplayer->SetPosition(XVec2{0, 0});
+        //player->CreateGdSprite("", XVec2{0, 0});
 
-        player->GetGdSprite()->SetTexture("res://assets/player.png");
+        gdplayer->SetTexture("res://assets/player.png");
 
-        player->GetGdSprite()->SetZIndex(0);
+        gdplayer->SetZIndex(0);
 
-        player->GetGdSprite()->SetPhysicsMode(PhysicsMode::Dynamic);
+        gdplayer->SetPhysicsMode(PhysicsMode::Dynamic);
         // 重力
-        player->GetGdSprite()->SetUseGravity(true);
-        player->GetGdSprite()->SetGravity(980.0f);
-        player->GetGdSprite()->SetGravityScale(0.0f);
+        gdplayer->SetUseGravity(true);
+        gdplayer->SetGravity(980.0f);
+        gdplayer->SetGravityScale(0.0f);
         // 物理参数
-        player->GetGdSprite()->SetMass(1.0f);
-        player->GetGdSprite()->SetDrag(2.0f);
+        gdplayer->SetMass(1.0f);
+        gdplayer->SetDrag(2.0f);
 
         // 玩家实体碰撞形状 碰撞过滤
-        player->GetGdSprite()->SetCollisionEnable(true);
-        player->GetGdSprite()->SetColliderCircle(XVec2{0.0f, 0.0f}, 32.0f);
-        player->GetGdSprite()->SetCollisionLayer(1);
-        player->GetGdSprite()->SetCollisionMask(2);
+        gdplayer->SetCollisionEnable(true);
+        gdplayer->SetColliderCircle(XVec2{0.0f, 0.0f}, 32.0f);
+        gdplayer->SetCollisionLayer(1);
+        gdplayer->SetCollisionMask(2);
 
-        player->GetGdSprite()->SetTriggerCircle(XVec2{0.0f, 0.0f}, 60.0f);
-        player->GetGdSprite()->SetTriggerLayer(1);
-        player->GetGdSprite()->SetTriggerMask(2);
+        gdplayer->SetTriggerCircle(XVec2{0.0f, 0.0f}, 60.0f);
+        gdplayer->SetTriggerLayer(1);
+        gdplayer->SetTriggerMask(2);
 
         mData->sprites.push_back(player);
 
-        auto bubble = player->GetQuoteBubble();
+        auto bubble = player->GetOrCreateQuoteBubble();
 
         // 相机改为死区跟随，人物不再被钉在屏幕正中。
         mData->camera->SetFollowSprite(player);
@@ -224,25 +231,26 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
     }
     {
         auto rock = makeShareObject<Sprite>("rock");
-        rock->CreateGdSprite("", XVec2{0, 0});
+        auto gdrock = rock->GetOrCreateGdSprite(SpriteType::sprite);
+        gdrock->SetPosition(XVec2{200, 200});
+      
+        gdrock->SetTexture("res://assets/rock_transparent.png");
 
-        rock->GetGdSprite()->SetTexture("res://assets/rock_transparent.png");
+        gdrock->SetZIndex(0);
 
-        rock->GetGdSprite()->SetZIndex(0);
+        gdrock->SetPosition(XVec2{200, 200});
 
-        rock->GetGdSprite()->SetPosition(XVec2{200, 200});
+        gdrock->SetScale(XVec2{0.1f, 0.1f});
 
-        rock->GetGdSprite()->SetScale(XVec2{0.1f, 0.1f});
-
-        rock->GetGdSprite()->SetPhysicsMode(PhysicsMode::Static);
+        gdrock->SetPhysicsMode(PhysicsMode::Static);
         // 根节点缩放为 0.1，因此 450 的局部半径最终显示为约 45 像素。、
-        rock->GetGdSprite()->SetColliderCircle(XVec2{0.0f, 0.0f}, 450.0f);
-        rock->GetGdSprite()->SetCollisionLayer(2);
-        rock->GetGdSprite()->SetCollisionMask(1);
+        gdrock->SetColliderCircle(XVec2{0.0f, 0.0f}, 450.0f);
+        gdrock->SetCollisionLayer(2);
+        gdrock->SetCollisionMask(1);
 
-        rock->GetGdSprite()->SetTriggerCircle(XVec2{0.0f, 0.0f}, 450.0f);
-        rock->GetGdSprite()->SetTriggerLayer(2);
-        rock->GetGdSprite()->SetTriggerMask(1);
+        gdrock->SetTriggerCircle(XVec2{0.0f, 0.0f}, 450.0f);
+        gdrock->SetTriggerLayer(2);
+        gdrock->SetTriggerMask(1);
 
         mData->sprites.push_back(rock);
     }
@@ -250,17 +258,39 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
     // 设置背景
     {
         auto background = makeShareObject<Sprite>("background");
-        background->CreateGdBackdrop();
+        auto gbbackground = background->GetOrCreateGdSprite(SpriteType::backdrop);
+        //background->CreateGdBackdrop();
 
         // 设置纹理
-        background->GetGdSprite()->SetTexture("res://assets/background.png");
-        background->GetGdSprite()->SetZIndex(-1);
+        gbbackground->SetTexture("res://assets/background.png");
+        gbbackground->SetZIndex(-1);
         // viewport 960 540
         // 图片2400 1600
         // background->GetGdSprite()->SetPosition(XVec2{480,-360});
         mData->sprites.push_back(background);
 
         // 设置纹理位置，是的背景和viewport对齐
+    }
+    //测试画笔绘制
+    {
+        auto pen = makeShareObject<GdPen>();
+        pen->CreatePen();
+        pen->SetPenColor(1,0,0,1);
+        pen->SetPenSize(10);
+        pen->DrawPolygons({XVec2{100,0},{XVec2{200,200}}});
+
+        pen->PenStamp();
+        pen->PenStampSprite(player->GetGdSprite());
+       // pen->EraseAll();
+    }
+
+    //音频测试
+    {
+        mData->audio = makeShareObject<GdAudio>();
+        mData->audio->CreateAudio();
+        auto aid = mData->audio->PlayFollowCamera("res://assets/bgm.wav");
+        mData->audio->SetLoop(aid, true); 
+        mData->audio->SetVolume(0.8);
     }
 }
 
@@ -279,11 +309,12 @@ void Game::OnEngineUpdate(float ddelta)
     GetCamera()->Follow(ddelta);
 
     if (mData->isMonitorInit == false)
-    {
-        auto root = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::root);
+    {   
+        auto m = mData->monitor->asDerived<Monitor>();
+        auto root = m->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::root);
         root->SetVisible(true);
 
-        auto label = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::value);
+        auto label = m->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::value);
         auto cavans_scale = label->GetCanvasScale();
         {
             auto ss = root->GetScale(); //(0.45,0.45)
@@ -321,8 +352,9 @@ void Game::OnKeyPressed(int64_t key)
     {
         // 临时测试
         static int index = 1;
-        auto root = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::root);
-        auto label = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::value);
+        auto m = mData->monitor->asDerived<Monitor>();
+        auto root = m->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::root);
+        auto label = m->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::value);
         auto cavans_scale = label->GetCanvasScale();
 
         auto w = (float)mData->viewport_width / cavans_scale.x;
@@ -350,6 +382,9 @@ void Game::OnKeyReleased(int64_t key)
         break;
     case Keys::down:
         mData->move_down = false;
+        break;
+    case Keys::space:
+        // 空格抬起无需处理；列出以保持 -Wswitch 全覆盖（新增按键枚举时能继续告警）
         break;
     }
 }
@@ -484,12 +519,12 @@ sptr<ICamera> Game::GetCamera() const
     return mData->camera;
 }
 
-sptr<IMonitor> Game::GetMonitor() const
+sptr<IUiComponent> Game::GetMonitor() const
 {
     return mData->monitor;
 }
 
-sptr<IUiAsk> Game::GetUiask() const
+sptr<IUiComponent> Game::GetUiask() const
 {
     return mData->uiask;
 }

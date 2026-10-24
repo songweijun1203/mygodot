@@ -1,6 +1,8 @@
 #include "DataManger.h"
 #include "manger/SpriteMgr.h"
 #include "manger/UiMgr.h"
+#include "manger/PenMgr.h"
+#include "manger/AudioMgr.h"
 
 #include "engine/Engine.h"
 
@@ -13,7 +15,9 @@ void DataManger::init()
         g_isInited = true;
         m_spriteMgr = makeShareObject<SpriteMgr>();
         m_uiMgr = makeShareObject<UiMgr>();
+        m_audioMgr = makeShareObject<AudioMgr>();
         m_engine = makeShareObject<Engine>();
+        m_penMgr = makeShareObject<PenMgr>();
     }
 }
 
@@ -34,6 +38,16 @@ sptr<IManger> DataManger::getSpriteMgr()
 sptr<IManger> DataManger::getUiMgr()
 {
     return m_uiMgr;
+}
+
+sptr<IManger> DataManger::getPenMgr()
+{
+    return m_penMgr;
+}
+
+sptr<IManger> DataManger::getAudioMgr()
+{
+    return m_audioMgr;
 }
 
 sptr<IEngine> DataManger::getEngine()

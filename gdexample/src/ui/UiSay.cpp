@@ -112,6 +112,10 @@ bool UiSay::CreateGdNode(const std::string &ui_path)
     return id != 0;
 }
 
+void UiSay::SetScale(const XVec2 &s)
+{
+}
+
 sptr<IGdUiNode> UiSay::GetChildUiNode(UiSayLeftOrRight type1,  UiSayOrThink type2) const
 {
     if(type2 == UiSayOrThink::say){
@@ -129,6 +133,7 @@ sptr<IGdUiNode> UiSay::GetChildUiNode(UiSayLeftOrRight type1,  UiSayOrThink type
              return mData->nodes.rightthink.label;
         }
     }
+    return nullptr;
 }
 
 sptr<IGdUiNode> UiSay::GetVariantRoot(UiSayLeftOrRight type1, UiSayOrThink type2) const
@@ -148,4 +153,5 @@ sptr<IGdUiNode> UiSay::GetVariantRoot(UiSayLeftOrRight type1, UiSayOrThink type2
              return mData->nodes.rightthink.vbox;
         }
     }
+    return nullptr;
 }

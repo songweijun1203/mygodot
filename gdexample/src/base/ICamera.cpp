@@ -1,6 +1,6 @@
 #include "ICamera.h"
 
-#include "base/IGdSprite.h"
+#include "gdbase/IGdSprite.h"
 #include "base/ISprite.h"
 
 #include <cmath>

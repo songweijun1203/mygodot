@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DataObject.h"
+#include "base/DataObject.h"
 
 class IGdUiNode:public XBaseObject{
 public:

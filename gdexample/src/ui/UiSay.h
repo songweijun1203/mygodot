@@ -31,6 +31,7 @@ public:
     void BindVariantNodes() override;
     sptr<IGdUiNode> GetUiNode() const override;
     bool CreateGdNode(const std::string& ui_path) override;
+    void SetScale(const XVec2& s) override;
 
     sptr<IGdUiNode> GetChildUiNode(UiSayLeftOrRight type1,  UiSayOrThink type2) const;
     sptr<IGdUiNode> GetVariantRoot(UiSayLeftOrRight type1,  UiSayOrThink type2) const;

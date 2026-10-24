@@ -77,6 +77,10 @@ sptr<IGdUiNode> UiQuote::GetUiNode() const
     return mData->uiNode;
 }
 
+void UiQuote::SetScale(const XVec2 &s)
+{
+}
+
 bool UiQuote::CreateGdNode(const std::string &ui_path)
 {
     auto uiMgr = DataManger::getInstance().getUiMgr()->asDerived<UiMgr>();

@@ -1,5 +1,6 @@
 #pragma once
 #include "base/IBubbleBase.h"
+#include "base/IUiComponent.h"
 
 class QuotoBubble : public IBubbleBase
 {

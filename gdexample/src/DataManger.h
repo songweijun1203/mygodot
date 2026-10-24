@@ -18,6 +18,8 @@ public:
     // 获取精灵管理器
     sptr<IManger> getSpriteMgr();
     sptr<IManger> getUiMgr();
+    sptr<IManger> getPenMgr();
+    sptr<IManger> getAudioMgr();
     sptr<IEngine> getEngine();
 
 private:
@@ -29,5 +31,7 @@ private:
 private:
     sptr<IManger> m_spriteMgr;
     sptr<IManger> m_uiMgr;
+    sptr<IManger> m_penMgr;
+    sptr<IManger> m_audioMgr;
     sptr<IEngine> m_engine;
 };

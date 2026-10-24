@@ -77,6 +77,10 @@ bool UiAsk::CreateGdNode(const std::string &ui_path)
     return id != 0;
 }
 
+void UiAsk::SetScale(const XVec2 &s)
+{
+}
+
 sptr<IGdUiNode> UiAsk::GetChildUiNode(UiAskNodeType type) const
 {
     switch (type)

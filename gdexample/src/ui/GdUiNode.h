@@ -1,4 +1,4 @@
-#include "base/IGdUiNode.h"
+#include "gdbase/IGdUiNode.h"
 
 class GdUiNode:public IGdUiNode{
     public:

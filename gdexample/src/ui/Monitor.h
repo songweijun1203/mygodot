@@ -1,8 +1,8 @@
 #pragma once
 
-#include "base/IMonitor.h"
+#include "base/IUiComponent.h"
 #include "base/mytype.h"
-#include "base/IGdUiNode.h"
+#include "gdbase/IGdUiNode.h"
 struct MonitorVariantPaths {
 	std::string root;       
 	std::string label;       
@@ -19,7 +19,26 @@ struct MonitorVariantNodes {
 	sptr<IGdUiNode> input{nullptr};
 };
 
-class Monitor : public IMonitor
+enum class MonitorNodeType
+{
+    root,
+    label,
+    value,
+    colorTarget,
+    input
+};
+
+enum class MonitorVariant {
+	Default = 0,
+	ValueOnly,
+	Scratch,
+	ScratchValueOnly,
+	List,
+	Slider,
+	Count
+};
+
+class Monitor : public IUiComponent
 {
 public:
     Monitor();
@@ -29,7 +48,7 @@ public:
     void SetScale(const XVec2& s) override;
     bool CreateGdNode(const std::string& ui_path) override;
     sptr<IGdUiNode> GetUiNode() const override;
-    sptr<IGdUiNode> GetChildUiNode(MonitorVariant variant, MonitorNodeType type) const override;
+    sptr<IGdUiNode> GetChildUiNode(MonitorVariant variant, MonitorNodeType type) const;
 private:
     class Internal;
     std::unique_ptr<Internal> mData;

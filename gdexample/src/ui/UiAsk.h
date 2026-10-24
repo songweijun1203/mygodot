@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/IUiAsk.h"
+#include "base/IUiComponent.h"
 
 struct UiAskVariantNodes{
     sptr<IGdUiNode> input{nullptr};   
@@ -9,14 +9,23 @@ struct UiAskVariantNodes{
     sptr<IGdUiNode> askLabel{nullptr};   
 };
 
-class UiAsk:public IUiAsk{
+enum class UiAskNodeType
+{
+    input,
+    check,
+    askLabel,
+    askBody,
+};
+
+class UiAsk:public IUiComponent{
 public:
     UiAsk();
     ~UiAsk();
     void BindVariantNodes() override;
     sptr<IGdUiNode> GetUiNode() const override;
     bool CreateGdNode(const std::string& ui_path) override;
-    sptr<IGdUiNode> GetChildUiNode(UiAskNodeType type) const override;
+    void SetScale(const XVec2& s) override;
+    sptr<IGdUiNode> GetChildUiNode(UiAskNodeType type) const;
 private:
     class Internal;
     std::unique_ptr<Internal> mData;
