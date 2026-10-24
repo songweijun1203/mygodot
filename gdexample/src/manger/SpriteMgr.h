@@ -81,4 +81,34 @@ public:
     void SetZIndex(Object_t id,int64_t index);
 
     void SetPosition(Object_t id,const XVec2& pos);
+
+    XVec2 GetPosition(Object_t id) const;
+
+    void SetScale(Object_t id,const XVec2& pos);
+
+    //关于物理相关的忌口
+    void SetPhysicsMode(Object_t id,PhysicsMode mode);
+    
+    void SetColliderCircle(Object_t id,const XVec2 &center, float radius);
+    void SetColliderRect(Object_t id,const XVec2 &center, const XVec2 &size);
+    void SetColliderCapsule(Object_t id,const XVec2 &center, const XVec2 &size);
+    void SetCollisionMask(Object_t id,uint32_t mask);
+    void SetCollisionLayer(Object_t id,uint32_t layer);
+
+    // 速度
+    void SetVelocity(Object_t id,const XVec2 &velocity);
+    XVec2 GetVelocity(Object_t id) const;
+
+    // 重力
+    void SetUseGravity(Object_t id,bool enabled);
+    void SetGravity(Object_t id,float gravity);
+    void SetGravityScale(Object_t id,float scale);
+
+    // 质量和阻力
+    void SetMass(Object_t id,float mass);
+    void SetDrag(Object_t id,float drag);
+
+    // 施力
+    void AddForce(Object_t id,const XVec2 &force);
+    void AddImpulse(Object_t id,const XVec2 &impulse);
 };

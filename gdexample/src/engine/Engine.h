@@ -7,4 +7,5 @@ public:
     void OnEngineUpdate(float delta) override;
     void OnKeyPressed(int64_t key) override;
     void OnKeyReleased(int64_t key) override;
+    void OnEngineFixedUpdate(float delta) override;
 };

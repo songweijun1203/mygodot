@@ -5,22 +5,31 @@
 #include "DataManger.h"
 #include "manger/SpriteMgr.h"
 #include "sprite/Sprite.h"
+#include "camera/Camera.h"
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 
 #include <cmath>
 #include <vector>
 
-#include<iostream>
+#include <iostream>
 
 class Game::Internal
 {
 public:
+    Internal()
+    {
+        camera = makeShareObject<Camera>();
+    }
+
+public:
     godot::Node *root;
     std::vector<sptr<ISprite>> sprites;
+    sptr<Camera> camera;
 
-    XVec2 player_position{0.0f, 0.0f};
     bool move_left = false;
     bool move_right = false;
     bool move_up = false;
@@ -38,20 +47,75 @@ Game::~Game()
 void Game::OnEngineStart(godot::Node *SpxEngineNode)
 {
     mData->root = SpxEngineNode;
+    {
+        auto *viewport = SpxEngineNode->get_viewport();
+        if (viewport != nullptr)
+        {
+            const godot::Vector2 size =
+                viewport->get_visible_rect().get_size();
+        }
 
-    //设置游戏精灵
+        auto *settings = godot::ProjectSettings::get_singleton();
+
+        const int64_t design_width = static_cast<int64_t>(
+            settings->get_setting(
+                "display/window/size/viewport_width",
+                640));
+
+        const int64_t design_height = static_cast<int64_t>(
+            settings->get_setting(
+                "display/window/size/viewport_height",
+                360));
+    }
+    // 设置游戏精灵
     {
         auto player = makeShareObject<Sprite>("player");
         player->CreateGdSprite("", XVec2{0, 0});
 
-        player->GetGdSprite()->SetTexture("res://assets/icon.svg");
+        player->GetGdSprite()->SetTexture("res://assets/player.png");
 
         player->GetGdSprite()->SetZIndex(0);
 
+        player->GetGdSprite()->SetPhysicsMode(PhysicsMode::Dynamic);
+        // 重力
+        player->GetGdSprite()->SetUseGravity(true);
+        player->GetGdSprite()->SetGravity(980.0f);
+        player->GetGdSprite()->SetGravityScale(1.0f);
+        // 物理参数
+        player->GetGdSprite()->SetMass(1.0f);
+        player->GetGdSprite()->SetDrag(2.0f);
+
+        // 玩家实体碰撞形状
+        player->GetGdSprite()->SetColliderCircle(XVec2{0.0f, 0.0f}, 32.0f);
+
+        // 碰撞过滤
+        player->GetGdSprite()->SetCollisionLayer(1);
+        player->GetGdSprite()->SetCollisionMask(2);
+
         mData->sprites.push_back(player);
     }
+    {
+        auto rock = makeShareObject<Sprite>("rock");
+        rock->CreateGdSprite("", XVec2{0, 0});
 
-    //设置背景
+        rock->GetGdSprite()->SetTexture("res://assets/rock_transparent.png");
+
+        rock->GetGdSprite()->SetZIndex(0);
+
+        rock->GetGdSprite()->SetPosition(XVec2{200, 200});
+
+        rock->GetGdSprite()->SetScale(XVec2{0.1f, 0.1f});
+
+        rock->GetGdSprite()->SetPhysicsMode(PhysicsMode::Static);
+        // 根节点缩放为 0.1，因此 450 的局部半径最终显示为约 45 像素。
+        rock->GetGdSprite()->SetColliderCircle(XVec2{0.0f, 0.0f}, 450.0f);
+        rock->GetGdSprite()->SetCollisionLayer(2);
+        rock->GetGdSprite()->SetCollisionMask(1);
+
+        mData->sprites.push_back(rock);
+    }
+
+    // 设置背景
     {
         auto background = makeShareObject<Sprite>("background");
         background->CreateGdBackdrop();
@@ -59,85 +123,129 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         // 设置纹理
         background->GetGdSprite()->SetTexture("res://assets/background.png");
         background->GetGdSprite()->SetZIndex(-1);
+        // viewport 960 540
+        // 图片2400 1600
+        // background->GetGdSprite()->SetPosition(XVec2{480,-360});
         mData->sprites.push_back(background);
-    }
 
+        // 设置纹理位置，是的背景和viewport对齐
+    }
 }
 void Game::OnEngineUpdate(float ddelta)
 {
+    (void)ddelta;
+
     auto player = GetSprite("player");
-    if (!player || !player->GetGdSprite()) {
+    if (!player || !player->GetGdSprite())
+    {
         return;
     }
-
+#if 0
     XVec2 direction{};
-    if (mData->move_left) {
+    if (mData->move_left)
+    {
         direction.x -= 1.0f;
     }
-    if (mData->move_right) {
+    if (mData->move_right)
+    {
         direction.x += 1.0f;
     }
-    if (mData->move_up) {
+    if (mData->move_up)
+    {
         direction.y += 1.0f;
     }
-    if (mData->move_down) {
+    if (mData->move_down)
+    {
         direction.y -= 1.0f;
     }
 
     // 对角线移动时归一化方向，避免速度变成约 1.414 倍。
     const float length = std::sqrt(
-            direction.x * direction.x + direction.y * direction.y);
-    if (length <= 0.0f) {
-        return;
+        direction.x * direction.x + direction.y * direction.y);
+    constexpr float player_speed = 200.0f;
+    XVec2 velocity{};
+    if (length > 0.0f)
+    {
+        velocity.x = direction.x / length * player_speed;
+        velocity.y = direction.y / length * player_speed;
     }
 
-    constexpr float player_speed = 200.0f;
-    direction.x /= length;
-    direction.y /= length;
-    mData->player_position.x += direction.x * player_speed * ddelta;
-    mData->player_position.y += direction.y * player_speed * ddelta;
-
-    player->GetGdSprite()->SetPosition(mData->player_position);
+    auto gd_sprite = player->GetGdSprite();
+    gd_sprite->SetVelocity(velocity);
+#endif
+    // 相机跟随物理结算后的实际位置，碰撞时不会继续穿过障碍物。
+    auto gd_sprite = player->GetGdSprite();
+    GetCamera()->SetPosition(gd_sprite->GetPosition());
 }
 
 void Game::OnKeyPressed(int64_t key)
 {
-    //键盘摁下
-    std::cout<<"OnKeyPressed:"<<key<<std::endl;
-    switch (static_cast<Keys>(key)) {
-        case Keys::left:
-            mData->move_left = true;
-            break;
-        case Keys::right:
-            mData->move_right = true;
-            break;
-        case Keys::up:
-            mData->move_up = true;
-            break;
-        case Keys::down:
-            mData->move_down = true;
-            break;
+    // 键盘摁下
+    std::cout << "OnKeyPressed:" << key << std::endl;
+    switch (static_cast<Keys>(key))
+    {
+    case Keys::left:
+        mData->move_left = true;
+        break;
+    case Keys::right:
+        mData->move_right = true;
+        break;
+    case Keys::up:
+        mData->move_up = true;
+        break;
+    case Keys::down:
+        mData->move_down = true;
+        break;
     }
 }
 
 void Game::OnKeyReleased(int64_t key)
 {
-    //键盘释放
-   std::cout<<"OnKeyReleased:"<<key<<std::endl;
-   switch (static_cast<Keys>(key)) {
-       case Keys::left:
-           mData->move_left = false;
-           break;
-       case Keys::right:
-           mData->move_right = false;
-           break;
-       case Keys::up:
-           mData->move_up = false;
-           break;
-       case Keys::down:
-           mData->move_down = false;
-           break;
-   }
+    // 键盘释放
+    std::cout << "OnKeyReleased:" << key << std::endl;
+    switch (static_cast<Keys>(key))
+    {
+    case Keys::left:
+        mData->move_left = false;
+        break;
+    case Keys::right:
+        mData->move_right = false;
+        break;
+    case Keys::up:
+        mData->move_up = false;
+        break;
+    case Keys::down:
+        mData->move_down = false;
+        break;
+    }
+}
+
+void Game::OnEngineFixedUpdate(float delta)
+{
+    auto player = GetSprite("player");
+    if (!player || !player->GetGdSprite())
+    {
+        return;
+    }
+
+    XVec2 force{};
+
+    if (mData->move_up)
+    {
+        force.y += 1500.0f;
+    }
+
+    if (mData->move_left)
+    {
+        force.x -= 800.0f;
+    }
+
+    if (mData->move_right)
+    {
+        force.x += 800.0f;
+    }
+
+    player->GetGdSprite()->AddForce(force);
 }
 
 sptr<ISprite> Game::GetSprite(const std::string &name)
@@ -150,4 +258,9 @@ sptr<ISprite> Game::GetSprite(const std::string &name)
         }
     }
     return nullptr;
+}
+
+sptr<ICamera> Game::GetCamera() const
+{
+    return mData->camera;
 }

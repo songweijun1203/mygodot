@@ -7,6 +7,7 @@ namespace godot{
 }
 
 class ISprite;
+class ICamera;
 class IGame:public XBaseObject{
 public:
     virtual ~IGame() = default;
@@ -14,6 +15,8 @@ public:
     virtual void OnEngineUpdate(float ddelta) = 0;
     virtual void OnKeyPressed(int64_t key) =0;
     virtual void OnKeyReleased(int64_t key) =0;
+    virtual void OnEngineFixedUpdate(float delta) = 0;
 
     virtual sptr<ISprite> GetSprite(const std::string& name) =0;
+    virtual sptr<ICamera> GetCamera() const=0;
 };

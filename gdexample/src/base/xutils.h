@@ -21,4 +21,9 @@ namespace xutils
         return a;
     }
 
+    inline XVec2 ToXVec2(const spx_api::GdVec2 &value)
+    {
+        return XVec2{value.x, value.y};
+    }
+
 } // namespace xutils

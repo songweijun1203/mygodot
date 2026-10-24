@@ -37,3 +37,10 @@ void Engine::OnKeyReleased(int64_t key)
         game->OnKeyReleased(key);
     }
 }
+
+void Engine::OnEngineFixedUpdate(float delta)
+{
+    if(auto game = GetGame()){
+        game->OnEngineFixedUpdate(delta);
+    }
+}
