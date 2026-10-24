@@ -1,0 +1,10 @@
+{
+  "VsCodeTaskButtons.tasks": [
+    {
+      "label": "$(play) build",
+      "task": "GdExample: build debug extension",
+      "tooltip": "运行构建任务"
+    }
+  ],
+  "cmake.sourceDirectory": "/Users/songweijun/Documents/code/mygodot/gdexample/godot-cpp"
+}

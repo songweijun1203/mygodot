@@ -1,5 +1,7 @@
 #include "GDCallBackHandler.h"
 #include "gdexample.h"
+#include "DataManger.h"
+#include "engine/Engine.h"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
@@ -23,19 +25,14 @@ void GDCallBackHandler::func_on_engine_start() {
     auto *window = tree->get_root();
     auto *spx_root = window->get_node_or_null(
 		godot::NodePath("SpxEngineNode"));
-        
+    
+	DataManger::getInstance().init();
 
-	auto *example = memnew(godot::GdExample);
-	example->set_name("GdExample");
-	example->set_position(godot::Vector2(320, 180));
-	example->set_message("Created from SPX callback");
-	//tree->get_current_scene()->add_child(example);
-
-    spx_root->add_child(example);
+	DataManger::getInstance().getEngine()->OnEngineStart(spx_root);
 }
 
 void GDCallBackHandler::func_on_engine_update(float delta) {
-    std::cout << "GDCallBackHandler::func_on_engine_update" << std::endl;
+    DataManger::getInstance().getEngine()->OnEngineUpdate(delta);
 }
 
 void GDCallBackHandler::func_on_engine_fixed_update(float delta) {
@@ -119,11 +116,11 @@ void GDCallBackHandler::func_on_mouse_released(spx_api::GdInt keyid) {
 }
 
 void GDCallBackHandler::func_on_key_pressed(spx_api::GdInt keyid) {
-
+	DataManger::getInstance().getEngine()->OnKeyPressed(keyid);
 }
 
 void GDCallBackHandler::func_on_key_released(spx_api::GdInt keyid) {
-
+	DataManger::getInstance().getEngine()->OnKeyReleased(keyid);
 }
 
 void GDCallBackHandler::func_on_action_pressed(spx_api::GdString action_name) {

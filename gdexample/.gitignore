@@ -2,3 +2,4 @@
 src/*.os
 project/bin/*
 project/.godot/
+build/

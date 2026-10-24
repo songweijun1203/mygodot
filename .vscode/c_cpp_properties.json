@@ -6,7 +6,10 @@
       "compilerPath": "/usr/bin/clang++",
       "cStandard": "c17",
       "cppStandard": "c++17",
-      "compileCommands": "${workspaceFolder:mygodot}/.spx-build/compile_commands.json",
+      "compileCommands": [
+        "${workspaceFolder:mygodot}/.spx-build/compile_commands.json",
+        "${workspaceFolder:mygodot}/.spx-build/gdexample-compile_commands.json"
+      ],
       "includePath": [
         "${workspaceFolder:mygodot}/godot_modules/spx",
         "${workspaceFolder:mygodot}/godot",
