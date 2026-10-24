@@ -23,6 +23,13 @@ enum class Keys : int64_t {
 	down = (1LL << 22) | 0x12   // Godot Key::DOWN  = 0x400012 = 4194322
 };
 
+enum class MouseKey:int64_t{
+	none =0,
+	left=1,
+	right=2,
+	middle=4
+};
+
 enum class PhysicsMode {
     NoPhysics = 0,
     Kinematic = 1,

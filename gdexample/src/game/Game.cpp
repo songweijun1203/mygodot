@@ -236,6 +236,16 @@ void Game::OnKeyReleased(int64_t key)
     }
 }
 
+void Game::OnMousePressed(int64_t key)
+{
+    std::cout<<"OnMousePressed"<<std::endl;
+}
+
+void Game::OnMouseReleased(int64_t key)
+{
+    std::cout<<"OnMouseReleased"<<std::endl;
+}
+
 void Game::OnEngineFixedUpdate(float delta)
 {
     auto player = GetSprite("player");

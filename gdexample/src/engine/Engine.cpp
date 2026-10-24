@@ -38,6 +38,20 @@ void Engine::OnKeyReleased(int64_t key)
     }
 }
 
+void Engine::OnMousePressed(int64_t key)
+{
+    if(auto game = GetGame()){
+        game->OnMousePressed(key);
+    }
+}
+
+void Engine::OnMouseReleased(int64_t key)
+{
+    if(auto game = GetGame()){
+        game->OnMouseReleased(key);
+    }
+}
+
 void Engine::OnEngineFixedUpdate(float delta)
 {
     if(auto game = GetGame()){

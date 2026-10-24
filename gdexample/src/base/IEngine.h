@@ -12,6 +12,8 @@ public:
     virtual void OnEngineUpdate(float delta) = 0;
     virtual void OnKeyPressed(int64_t key) =0;
     virtual void OnKeyReleased(int64_t key) =0;
+    virtual void OnMousePressed(int64_t key) =0;
+    virtual void OnMouseReleased(int64_t key) =0;
 
     virtual void OnEngineFixedUpdate(float delta) = 0;
     virtual void OnSpriteCollisionEnter(Object_t src,Object_t dest) =0;

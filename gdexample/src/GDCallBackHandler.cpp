@@ -116,10 +116,12 @@ void GDCallBackHandler::func_on_sprite_screen_entered(spx_api::GdInt obj)
 
 void GDCallBackHandler::func_on_mouse_pressed(spx_api::GdInt keyid)
 {
+	DataManger::getInstance().getEngine()->OnMousePressed(keyid);
 }
 
 void GDCallBackHandler::func_on_mouse_released(spx_api::GdInt keyid)
 {
+	DataManger::getInstance().getEngine()->OnMouseReleased(keyid);
 }
 
 void GDCallBackHandler::func_on_key_pressed(spx_api::GdInt keyid)
