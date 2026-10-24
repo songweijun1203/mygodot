@@ -11,14 +11,9 @@ class UiMgr : public BaseManger {
     float SetTextMaxWidth(Object_t object_id, const std::string &text,float width);
     void SetVisible(Object_t object_id,bool visible);
     void SetFontSize(Object_t object_id,int64_t size);
-
-    /**
-     * @brief 设置 UI 节点的局部缩放。
-     *
-     * @param object_id SPX UI 节点 ID。
-     * @param scale X、Y 方向的缩放系数。
-     */
     void SetScale(Object_t object_id, const XVec2 &scale);
     XVec2 GetScale(Object_t);
     XVec2 GetCanvasScale(Object_t);
+    void SetPosition(Object_t object_id,const XVec2& scale);
+    XVec2 GetPosition(Object_t object_id) const ;
 };

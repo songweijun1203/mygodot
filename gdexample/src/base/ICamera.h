@@ -78,6 +78,38 @@ public:
 
     sptr<ISprite> GetFollowSprite() const;
 
+    /**
+     * @brief 设置死区跟随的死区大小。
+     *
+     * @param deadzone 死区占可见世界的比例，不是世界坐标。{0.5, 0.5} 表示
+     * 死区是屏幕中央的四分之一面积（每边一半）；某个轴为 0 时该轴每帧跟随。
+     */
+    void SetFollowDeadzone(const XVec2 &deadzone);
+
+    /**
+     * @brief 设置相机追赶跟随目标的快慢。
+     *
+     * @param damping 每秒逼近的强度，越大越紧跟；小于等于 0 表示不做平滑，
+     * 直接落到目标位置。
+     */
+    void SetFollowDamping(float damping);
+
+    /**
+     * @brief 按死区规则推进相机一帧，需要在游戏循环里每帧调用。
+     *
+     * 目标在死区内时相机保持不动，离开死区后相机以阻尼方式把它推回死区边缘，
+     * 所以人物不会始终停在屏幕正中，走动时会有偏移、停下时停在边缘附近。
+     *
+     * 这里每次都读相机当前位置再往前推，引擎的相机边界限制会自然生效；
+     * 使用本方法时建议关闭 SetCameraSmoothing，避免两段延迟叠加。
+     *
+     * @param delta 距离上一帧的秒数。
+     */
+    void Follow(float delta);
+
     private:
         wptr<ISprite> followSprite;
+        // 死区默认取可见区域的 0.5 宽 × 0.35 高，俯视角用着比较稳。
+        XVec2 followDeadzone{0.5f, 0.35f};
+        float followDamping = 6.0f;
 };

@@ -1,18 +1,20 @@
-#include "GdMonitor.h"
+#include "Monitor.h"
 #include "DataManger.h"
 #include "manger/UiMgr.h"
 #include "GdUiNode.h"
 
 /*
-struct MonitorViewSpec  {
-	std::string root;               当前外观的根容器
+struct MonitorVariantPaths {
+	std::string root;               当前变体的根容器
 	std::string label;              变量名 Label 显示 Monitor 的名称，例如 score
 	std::string value;              数值 Label 显示变量或表达式的值
 	std::string colorTarget;        背景或颜色容器 设置 Monitor 的颜色
 	std::string input;              输入控件 滑块样式中对应的 HSlider
 };
 */
-static MonitorViewSpec m[6]={
+static constexpr int kMonitorVariantCount = static_cast<int>(MonitorVariant::Count);
+
+static const MonitorVariantPaths kMonitorVariantPaths[kMonitorVariantCount] = {
  {
     "BG",
     "BG/H/LabelName",
@@ -58,21 +60,21 @@ static MonitorViewSpec m[6]={
 
 };
 
-class GdMonitor::Internal{
+class Monitor::Internal{
 public:
-    MonitorView monitorviews[6];
+    MonitorVariantNodes variant_nodes[kMonitorVariantCount];
     sptr<IGdUiNode> uiNode;
 };
 
-GdMonitor::GdMonitor():mData(std::make_unique<Internal>())
+Monitor::Monitor():mData(std::make_unique<Internal>())
 {
 }
 
-GdMonitor::~GdMonitor()
+Monitor::~Monitor()
 {
 }
 
-void GdMonitor::BindViews()
+void Monitor::BindVariantNodes()
 {
     auto bindFn =[this](const std::string& path)->std::optional <Object_t>{
         if(path ==""){
@@ -82,50 +84,50 @@ void GdMonitor::BindViews()
         return uiMgr->BindNode(GetUiNode()->GetId(),path);
     };
 
-    for(int i=0;i<6;i++){
-        auto root_id = bindFn(m[i].root);
-        auto colorTarget_id = bindFn(m[i].colorTarget);
-        auto input_id = bindFn(m[i].input);
-        auto label_id = bindFn(m[i].label);
-        auto value_id = bindFn(m[i].value);
+    for(int i = 0; i < kMonitorVariantCount; i++){
+        auto root_id = bindFn(kMonitorVariantPaths[i].root);
+        auto colorTarget_id = bindFn(kMonitorVariantPaths[i].colorTarget);
+        auto input_id = bindFn(kMonitorVariantPaths[i].input);
+        auto label_id = bindFn(kMonitorVariantPaths[i].label);
+        auto value_id = bindFn(kMonitorVariantPaths[i].value);
         if(root_id){
             auto node = makeShareObject<GdUiNode>();
             node->SetId(*root_id);
-            mData->monitorviews[i].root =node;
+            mData->variant_nodes[i].root =node;
         }
         if(colorTarget_id){
             auto node = makeShareObject<GdUiNode>();
             node->SetId(*colorTarget_id);
-            mData->monitorviews[i].colorTarget =node;
+            mData->variant_nodes[i].colorTarget =node;
         }
 
         if(input_id){
             auto node = makeShareObject<GdUiNode>();
             node->SetId(*input_id);
-            mData->monitorviews[i].input =node;
+            mData->variant_nodes[i].input =node;
         }
 
         if(label_id){
             auto node = makeShareObject<GdUiNode>();
             node->SetId(*label_id);
-            mData->monitorviews[i].label =node;
+            mData->variant_nodes[i].label =node;
         }
 
         if(value_id){
             auto node = makeShareObject<GdUiNode>();
             node->SetId(*value_id);
-            mData->monitorviews[i].value =node;
+            mData->variant_nodes[i].value =node;
         }
     }
 
 }
 
-void GdMonitor::SetScale(const XVec2 &s)
+void Monitor::SetScale(const XVec2 &s)
 {
     mData->uiNode->SetScale(s);
 }
 
-bool GdMonitor::CreateGdNode(const std::string &ui_path)
+bool Monitor::CreateGdNode(const std::string &ui_path)
 {
     auto uiMgr = DataManger::getInstance().getUiMgr()->asDerived<UiMgr>();
     if(!uiMgr)
@@ -136,26 +138,26 @@ bool GdMonitor::CreateGdNode(const std::string &ui_path)
     return id != 0;
 }
 
-sptr<IGdUiNode> GdMonitor::GetUiNode() const
+sptr<IGdUiNode> Monitor::GetUiNode() const
 {
     return mData->uiNode;
 }
 
-sptr<IGdUiNode> GdMonitor::GetChildUiNode(const MonitorAppearance &apperaence, const MonitorViewType &type) const
+sptr<IGdUiNode> Monitor::GetChildUiNode(MonitorVariant variant, MonitorNodeType type) const
 {   
-    auto index =(int64_t)apperaence;
+    auto index = (int64_t)variant;
     switch (type)
     {
-    case MonitorViewType::coloeTarget:
-        return mData->monitorviews[index].root;
-    case MonitorViewType::input:
-        return mData->monitorviews[index].input;
-    case MonitorViewType::label:
-        return mData->monitorviews[index].label;
-    case MonitorViewType::root:
-        return mData->monitorviews[index].root;
-    case MonitorViewType::value:
-        return mData->monitorviews[index].value;
+    case MonitorNodeType::colorTarget:
+        return mData->variant_nodes[index].colorTarget;
+    case MonitorNodeType::input:
+        return mData->variant_nodes[index].input;
+    case MonitorNodeType::label:
+        return mData->variant_nodes[index].label;
+    case MonitorNodeType::root:
+        return mData->variant_nodes[index].root;
+    case MonitorNodeType::value:
+        return mData->variant_nodes[index].value;
     default:
         return nullptr;
     }

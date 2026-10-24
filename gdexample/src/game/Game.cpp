@@ -5,7 +5,10 @@
 #include "DataManger.h"
 #include "manger/SpriteMgr.h"
 #include "sprite/Sprite.h"
-#include "ui/GdMonitor.h"
+#include "ui/Monitor.h"
+#include "ui/UiAsk.h"
+#include "ui/UiSay.h"
+#include "ui/UiQuote.h"
 #include "camera/Camera.h"
 #include "spx_api.h"
 
@@ -22,12 +25,11 @@
 
 #include <iostream>
 
-//临时测试
+// 临时测试
 std::vector<std::string> monitor_test_labels{
     {"SetScratchValueOnlyLabelValueText SetScratchValueOnlyLabelValueText"},
     {"test!"},
-    {"helloworld"}
-};
+    {"helloworld"}};
 
 class Game::Internal
 {
@@ -43,7 +45,10 @@ public:
     godot::Node *root;
     std::vector<sptr<ISprite>> sprites;
     sptr<Camera> camera;
-    sptr<IGdMonitor> monitor;
+    sptr<IMonitor> monitor;
+    sptr<IUiAsk> uiask;
+    sptr<IUiComponent> uiSay;
+    sptr<IUiComponent> uiQuote;
     int64_t viewport_width;
     int64_t viewport_height;
 
@@ -100,16 +105,74 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         mData->viewport_width = design_width;
         mData->viewport_height = design_height;
     }
-    // 监视器节点
+    // 监视器节点 创建
     {
-        mData->monitor = makeShareObject<GdMonitor>();
+        mData->monitor = makeShareObject<Monitor>();
         mData->monitor->CreateGdNode("res://engine/ui/UiMonitor.tscn");
-        mData->monitor->BindViews();
+        mData->monitor->BindVariantNodes();
 
-        mData->monitor->GetUiNode()->SetVisible(true);
+        mData->monitor->GetUiNode()->SetVisible(false);
         mData->monitor->GetUiNode()->SetScale(XVec2{3, 3});
+    }
 
-        // 当前窗口的宽高已经获取到
+    // uiask节点创建
+    {
+        mData->uiask = makeShareObject<UiAsk>();
+        if (mData->uiask->CreateGdNode("res://engine/ui/UiAsk.tscn"))
+        {
+            mData->uiask->GetUiNode()->SetVisible(false);
+            mData->uiask->BindVariantNodes();
+            auto ask_body = mData->uiask->GetChildUiNode(UiAskNodeType::askBody);
+            if (ask_body)
+            {
+                ask_body->SetVisible(true);
+            }
+            auto label_ask = mData->uiask->GetChildUiNode(UiAskNodeType::askLabel);
+            label_ask->SetText("2134429530859045646456456456456666666666346734567375543457457347435734575437337354680456");
+        }
+    }
+
+    // uisay节点创建
+    {
+        mData->uiSay = makeShareObject<UiSay>();
+        if (mData->uiSay->CreateGdNode("res://engine/ui/UiSay.tscn"))
+        {
+            auto ui_say =mData->uiSay->asDerived<UiSay>();
+
+            ui_say->BindVariantNodes();
+            auto leftSay = ui_say->GetChildUiNode(UiSayLeftOrRight::left, UiSayOrThink::say);
+            auto leftThink = ui_say->GetChildUiNode(UiSayLeftOrRight::left, UiSayOrThink::think);
+            auto left_bubble = ui_say->GetVariantRoot(UiSayLeftOrRight::left,UiSayOrThink::say);
+            auto rightSay = ui_say->GetChildUiNode(UiSayLeftOrRight::right, UiSayOrThink::say);
+            auto rightThink = ui_say->GetChildUiNode(UiSayLeftOrRight::right, UiSayOrThink::think);
+            auto right_bubble = ui_say->GetVariantRoot(UiSayLeftOrRight::right,UiSayOrThink::say);
+           
+            left_bubble->SetVisible(true);
+            right_bubble->SetVisible(true);
+           
+            leftSay->SetText("left say");
+            rightSay->SetText("right say");
+            leftThink->SetText("left think");
+            rightThink->SetText("right think");
+
+             mData->uiSay->GetUiNode()->SetPosition(XVec2{300, 300});
+        }
+    }
+
+    //uiquote节点
+    {   
+
+        mData->uiQuote = makeShareObject<UiQuote>();
+        if (mData->uiQuote->CreateGdNode("res://engine/ui/UiQuote.tscn")){
+            auto ui_quote =mData->uiQuote->asDerived<UiQuote>();
+            ui_quote->BindVariantNodes();
+
+            auto msg = ui_quote->GetChildUiNode(UiQuoteNodeType::labelMsg);
+            auto des = ui_quote->GetChildUiNode(UiQuoteNodeType::labelDes);
+            msg->SetText("quto msg");
+            des->SetText("quto des");
+            ui_quote->GetUiNode()->SetPosition(XVec2{100,100});
+        }
     }
     // 使用碰撞形状判断触发器，不根据纹理透明像素判断重叠。
     auto &spx = spx_api::GDExtensionInterface::get_instance();
@@ -147,6 +210,15 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         player->GetGdSprite()->SetTriggerMask(2);
 
         mData->sprites.push_back(player);
+
+        // 相机改为死区跟随，人物不再被钉在屏幕正中。
+        mData->camera->SetFollowSprite(player);
+        // 引擎自带的位置平滑会和 Follow 的阻尼叠加成两段延迟，
+        // 平滑交给 Follow 自己做。
+        mData->camera->SetCameraSmoothing(false);
+        // 这两个值决定手感，改这里就够了。
+        mData->camera->SetFollowDeadzone(XVec2{0.5f, 0.35f});
+        mData->camera->SetFollowDamping(6.0f);
     }
     {
         auto rock = makeShareObject<Sprite>("rock");
@@ -189,10 +261,12 @@ void Game::OnEngineStart(godot::Node *SpxEngineNode)
         // 设置纹理位置，是的背景和viewport对齐
     }
 }
+
 void Game::OnEngineUpdate(float ddelta)
 {
-    (void)ddelta;
-
+    auto rect = GetCamera()->GetViewportRect();
+    auto sss = rect.size;
+    std::cout << sss.x << "  " << sss.y << std::endl;
     auto player = GetSprite("player");
     if (!player || !player->GetGdSprite())
     {
@@ -232,15 +306,15 @@ void Game::OnEngineUpdate(float ddelta)
     gd_sprite->SetVelocity(velocity);
 #endif
     // 相机跟随物理结算后的实际位置，碰撞时不会继续穿过障碍物。
-    auto gd_sprite = player->GetGdSprite();
-    GetCamera()->SetPosition(gd_sprite->GetPosition());
+    // 死区规则在 ICamera::Follow 里，人物只在死区外才拖着相机走。
+    GetCamera()->Follow(ddelta);
 
     if (mData->isMonitorInit == false)
     {
-        auto root = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::root);
+        auto root = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::root);
         root->SetVisible(true);
 
-        auto label = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::value);
+        auto label = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::value);
         auto cavans_scale = label->GetCanvasScale();
         {
             auto ss = root->GetScale(); //(0.45,0.45)
@@ -276,19 +350,18 @@ void Game::OnKeyPressed(int64_t key)
         break;
     case Keys::space:
     {
-        //临时测试
+        // 临时测试
         static int index = 1;
-        auto root = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::root);
-        auto label = mData->monitor->GetChildUiNode(MonitorAppearance::MonitorAppearanceCompatibleLarge, MonitorViewType::value);
+        auto root = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::root);
+        auto label = mData->monitor->GetChildUiNode(MonitorVariant::ScratchValueOnly, MonitorNodeType::value);
         auto cavans_scale = label->GetCanvasScale();
 
         auto w = (float)mData->viewport_width / cavans_scale.x;
-        index = (index+1)%3;
+        index = (index + 1) % 3;
         auto r_w = label->SetTextMaxWidth(monitor_test_labels[index], w - 4 - 18);
     }
-        break;
+    break;
     }
-    
 }
 
 void Game::OnKeyReleased(int64_t key)
@@ -438,7 +511,12 @@ sptr<ICamera> Game::GetCamera() const
     return mData->camera;
 }
 
-sptr<IGdMonitor> Game::GetMonitor() const
+sptr<IMonitor> Game::GetMonitor() const
 {
     return mData->monitor;
+}
+
+sptr<IUiAsk> Game::GetUiask() const
+{
+    return mData->uiask;
 }

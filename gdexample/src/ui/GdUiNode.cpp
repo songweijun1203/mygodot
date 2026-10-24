@@ -38,3 +38,15 @@ float GdUiNode::SetTextMaxWidth(const std::string &text, float width)
     auto uiMgr = DataManger::getInstance().getUiMgr()->asDerived<UiMgr>();
     return uiMgr->SetTextMaxWidth(GetId(),text,width);
 }
+
+void GdUiNode::SetPosition(const XVec2 &position)
+{
+    auto uiMgr = DataManger::getInstance().getUiMgr()->asDerived<UiMgr>();
+    uiMgr->SetPosition(GetId(),position);
+}
+
+XVec2 GdUiNode::GetPosition() const
+{
+    auto uiMgr = DataManger::getInstance().getUiMgr()->asDerived<UiMgr>();
+    return uiMgr->GetPosition(GetId());
+}

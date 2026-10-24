@@ -89,3 +89,17 @@ XVec2 UiMgr::GetCanvasScale(Object_t object_id)
     api.ui_get_canvas_scale(object_id, &ret_value);
     return XVec2{ret_value.x, ret_value.y};
 }
+
+void UiMgr::SetPosition(Object_t object_id, const XVec2 &position)
+{
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    api.ui_set_position(object_id,xutils::ToGdVec2(position));
+}
+
+XVec2 UiMgr::GetPosition(Object_t object_id) const
+{
+    auto &api = spx_api::GDExtensionInterface::get_instance();
+    spx_api::GdVec2 ret_value;
+    api.ui_get_position(object_id, &ret_value);
+    return XVec2{ret_value.x, ret_value.y};
+}

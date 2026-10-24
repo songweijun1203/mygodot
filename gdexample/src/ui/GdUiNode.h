@@ -21,6 +21,9 @@ class GdUiNode:public IGdUiNode{
     XVec2 GetCanvasScale() const override;
 
     float SetTextMaxWidth(const std::string& text,float width) override;
+
+    void SetPosition(const XVec2& scale) override;
+    XVec2 GetPosition() const override;
 public:
     Object_t id;
 };
