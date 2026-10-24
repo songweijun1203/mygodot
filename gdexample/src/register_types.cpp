@@ -1,5 +1,7 @@
 #include "gdexample.h"
 #include "register_types.h"
+#include "spx_api.h"
+#include "GDCallBackHandler.h"
 
 #include <gdextension_interface.h>
 
@@ -32,6 +34,17 @@ GDExtensionBool GDE_EXPORT gdexample_library_init(
 	godot::GDExtensionBinding::InitObject init_obj(
 			p_get_proc_address, p_library, r_initialization);
 
+	auto &spx = spx_api::GDExtensionInterface::get_instance();
+	spx.initialize(p_get_proc_address);
+	if (!spx) {
+		return false;
+	}
+
+	auto s = GDCallBackHandler::build_callback_info();
+	spx.global_register_callbacks((spx_api::GDExtensionSpxCallbackInfoPtr)&s);
+
+
+	// 注册GdExample类
 	init_obj.register_initializer(initialize_gdexample);
 	init_obj.register_terminator(uninitialize_gdexample);
 	init_obj.set_minimum_library_initialization_level(

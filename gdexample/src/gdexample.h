@@ -1,5 +1,7 @@
 #pragma once
 
+#include "spx_api.h"
+
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/variant/string.hpp>
 
@@ -11,6 +13,7 @@ class GdExample : public Node2D {
 
 private:
 	String message = "Hello from C++ GDExtension";
+	spx_api::ObjectId spx_sprite_id = 0;
 
 protected:
 	static void _bind_methods();

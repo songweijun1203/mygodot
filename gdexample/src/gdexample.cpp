@@ -5,6 +5,8 @@
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <iostream>
+
 using namespace godot;
 
 void GdExample::_bind_methods() {
@@ -14,16 +16,7 @@ void GdExample::_bind_methods() {
 }
 
 void GdExample::_ready() {
-	auto *message_label = memnew(Label);
-	message_label->set_name("Message");
-	message_label->set_text(message);
-	message_label->set_position(Vector2(-160, 70));
-	message_label->set_size(Vector2(320, 32));
-	message_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
-	add_child(message_label);
-
-	UtilityFunctions::print("GdExample ready: ", message);
-	queue_redraw();
+	std::cout << "GdExample::_ready() called" << std::endl;
 }
 
 void GdExample::_draw() {
